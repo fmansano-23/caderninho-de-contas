@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caderninho de Contas</title>
+<style>
+@font-face{font-family:"Andika";font-weight:400;font-style:normal;font-display:swap;src:local("Andika"),url("fonts/Andika-Regular.ttf") format("truetype")}
+@font-face{font-family:"Andika";font-weight:700;font-style:normal;font-display:swap;src:local("Andika Bold"),local("Andika-Bold"),url("fonts/Andika-Bold.ttf") format("truetype")}
+:root{
+  --bg:#f1f0ea;--paper:#fffefa;--ink:#1f2a44;--muted:#66718c;--line:#d3e2f2;--margin:#f2b9b9;
+  --accent:#3b6fd4;--accent-ink:#ffffff;--accent-soft:#e3ecfb;
+  --ok:#2b9367;--ok-soft:#e0f3ea;
+  --warn:#e8a63a;--warn-soft:#fff0cb;--warn-ink:#7a4d00;
+  --star:#f0b429;--shadow:0 2px 10px rgba(31,42,68,.08);
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121620;--paper:#1a2030;--ink:#e8ecf6;--muted:#9aa6c2;--line:#2b3750;--margin:#6e4455;
+    --accent:#7ba3ff;--accent-ink:#0f1830;--accent-soft:#222f4d;
+    --ok:#5cd0a0;--ok-soft:#1d3a31;
+    --warn:#e8b04f;--warn-soft:#3a2f17;--warn-ink:#f0c36b;
+    --star:#f5c24a;--shadow:0 2px 10px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121620;--paper:#1a2030;--ink:#e8ecf6;--muted:#9aa6c2;--line:#2b3750;--margin:#6e4455;
+  --accent:#7ba3ff;--accent-ink:#0f1830;--accent-soft:#222f4d;
+  --ok:#5cd0a0;--ok-soft:#1d3a31;
+  --warn:#e8b04f;--warn-soft:#3a2f17;--warn-ink:#f0c36b;
+  --star:#f5c24a;--shadow:0 2px 10px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Andika","Trebuchet MS","Segoe UI",system-ui,sans-serif;font-size:17px;line-height:1.35;-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+button{font:inherit;color:inherit;touch-action:manipulation;-webkit-user-select:none;user-select:none;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+h1,h2,h3{margin:0}
+.wrap{max-width:520px;margin:0 auto;padding:16px}
+
+/* botões */
+.btn{border:0;border-radius:14px;padding:12px 18px;font-weight:700;background:var(--accent-soft);color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.line{background:transparent;border:1.5px solid var(--line);color:var(--ink)}
+.btn.block{display:block;width:100%}
+.btn:disabled{opacity:.4;cursor:default}
+.ghost{background:none;border:0;font-size:17px;padding:8px;min-width:46px;min-height:46px;color:var(--muted)}
+
+/* início */
+.hello{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:6px 0 16px}
+.hello h1{font-size:25px}
+.pts{background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:6px 14px;font-weight:700;white-space:nowrap}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+.card.hl{border-color:var(--accent);background:var(--accent-soft)}
+.card h3{font-size:18px;margin-bottom:4px}
+.card p{margin:0 0 10px;color:var(--muted);font-size:15px}
+.trk{display:flex;align-items:center;gap:12px}
+.ico{width:48px;height:48px;border-radius:14px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:28px;font-weight:700;flex:none}
+.info{flex:1;min-width:0}
+.info h3{margin:0}
+.info p{margin:2px 0 8px}
+.dots{display:flex;gap:5px}
+.dot{width:16px;height:6px;border-radius:3px;background:var(--line)}
+.dot.full{background:var(--ok)}
+.dot.cur{background:var(--accent)}
+.links{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.note{font-size:14px;color:var(--muted);text-align:center;margin:10px 0}
+
+/* cabeçalho das folhas */
+.shead{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.shead .ttl{flex:1;text-align:center;display:flex;flex-direction:column;min-width:0}
+.shead .ttl small{color:var(--muted);font-size:13px}
+.clock{font-weight:700;font-variant-numeric:tabular-nums;font-size:21px;min-width:64px;text-align:right}
+.clock.late{color:var(--warn-ink)}
+.spacer{min-width:64px}
+
+/* folha de caderno */
+.sheetwrap,.testwrap{padding-bottom:350px}
+.paper{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.paper::before{content:"";position:absolute;left:46px;top:0;bottom:0;width:2px;background:var(--margin);opacity:.8}
+.row{display:flex;align-items:center;height:58px;border-bottom:1px solid var(--line);padding:0 12px 0 8px;gap:10px;position:relative;cursor:pointer}
+.row:last-child{border-bottom:0}
+.row .n{width:28px;text-align:right;color:var(--muted);font-size:14px;flex:none}
+.row .eq{flex:1;padding-left:12px;font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.box{min-width:84px;height:40px;border-bottom:3px solid var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.row .mk{width:24px;text-align:center;font-weight:700;flex:none}
+.row.sel{background:var(--accent-soft)}
+.row.sel .box{border-color:var(--accent)}
+.row.sel .box:empty::after{content:"";width:2px;height:26px;background:var(--accent);animation:blink 1s steps(1) infinite}
+.row.review{background:var(--warn-soft)}
+.row.review .box{border-color:var(--warn)}
+.row.review .mk{color:var(--warn-ink)}
+.row.ok{cursor:default}
+.row.ok .box{color:var(--ok);border-color:var(--ok)}
+.row.ok .mk{color:var(--ok)}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.row.sel .box:empty::after{animation:none}}
+
+/* teclado */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--paper);border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(0,0,0,.08);padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px))}
+.dock>*{max-width:520px;margin-left:auto;margin-right:auto}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;color:var(--muted);font-size:15px;min-height:46px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{height:56px;border-radius:14px;border:1px solid var(--line);background:var(--bg);font-size:26px;font-weight:700}
+.pad button:active{background:var(--accent-soft)}
+.pad .alt{color:var(--muted)}
+.pad .go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+@media (max-height:720px){.pad button{height:46px}.bar{min-height:42px}.sheetwrap,.testwrap{padding-bottom:300px}}
+
+/* teste de nível */
+.qdots{display:flex;justify-content:center;gap:8px;margin:24px 0 0}
+.qdots i{width:12px;height:12px;border-radius:50%;background:var(--line)}
+.qdots i.done{background:var(--accent)}
+.bigq{display:flex;align-items:center;justify-content:center;gap:14px;font-size:46px;font-weight:700;margin:36px 0;font-variant-numeric:tabular-nums;white-space:nowrap}
+.box.big{min-width:120px;height:66px;font-size:46px;border-color:var(--accent)}
+.box.big:empty::after{content:"";width:3px;height:44px;background:var(--accent);animation:blink 1s steps(1) infinite}
+@media (prefers-reduced-motion:reduce){.box.big:empty::after{animation:none}}
+
+/* resultado */
+.center{text-align:center}
+.stars{font-size:46px;letter-spacing:6px;color:var(--star);margin:6px 0}
+.stars .off{opacity:.25}
+.big-t{font-size:26px;margin:6px 0 4px}
+.sub-t{color:var(--muted);margin:0 0 14px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px 12px;text-align:left}
+.stat small{display:block;color:var(--muted);font-size:13px}
+.stat b{font-size:20px;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;background:var(--ok-soft);color:var(--ok);border-radius:999px;padding:5px 12px;font-weight:700;font-size:15px;margin:4px 0}
+.stack{display:grid;gap:10px;margin-top:14px}
+
+/* pais */
+label.f{display:block;font-weight:700;margin:12px 0 4px;font-size:15px}
+input[type=text],select,textarea{width:100%;font:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+textarea{min-height:90px;font-size:13px;word-break:break-all}
+.hrow{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.hrow:last-child{border-bottom:0}
+.hrow b{font-weight:700}
+.hrow .r{text-align:right;color:var(--muted);white-space:nowrap}
+.sum{display:flex;gap:10px;flex-wrap:wrap}
+.sum div{flex:1;min-width:90px;background:var(--bg);border-radius:12px;padding:8px 10px}
+.sum small{display:block;color:var(--muted);font-size:12px}
+.sum b{font-size:20px}
+
+/* modal e aviso */
+#modal{position:fixed;inset:0;background:rgba(10,15,30,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}
+#modal.on{display:flex}
+.mbox{background:var(--paper);border-radius:20px;padding:22px;max-width:360px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.mbox h3{font-size:22px;margin-bottom:8px}
+.mbox p{margin:0 0 16px;color:var(--muted)}
+.mbtn{display:flex;gap:8px;flex-wrap:wrap}
+.mbtn .btn{flex:1;min-width:120px}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:15px;z-index:30;display:none;max-width:90%;text-align:center}
+#toast.on{display:block}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal" role="dialog" aria-modal="true"></div>
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ============ utilidades ============ */
+const $ = s => document.querySelector(s);
+const app = $('#app');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const fmt = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const OP = { '+': '+', '-': '\u2212', '*': '\u00d7' };
+
+/* ============ trilhas e fases ============ */
+const mk = (a, b, op) => ({ a, b, op, ans: op === '+' ? a + b : op === '-' ? a - b : a * b });
+const poolAdd = (aMin, aMax, bMin, bMax, sMin, sMax) => () => {
+  const r = [];
+  for (let a = aMin; a <= aMax; a++) for (let b = bMin; b <= bMax; b++) { const s = a + b; if (s >= sMin && s <= sMax) r.push(mk(a, b, '+')); }
+  return r;
+};
+const poolSub = (aMin, aMax, bMin, bMax, strict) => () => {
+  const r = [];
+  for (let a = aMin; a <= aMax; a++) for (let b = bMin; b <= bMax; b++) if (b <= a - (strict ? 1 : 0)) r.push(mk(a, b, '-'));
+  return r;
+};
+const fromPool = pool => n => shuffle(pool()).slice(0, n);
+const multGen = (focus, review) => n => {
+  const nf = review.length ? Math.ceil(n * 0.7) : n;
+  const f = [], r = [];
+  focus.forEach(t => { for (let b = 1; b <= 10; b++) f.push([t, b]); });
+  review.forEach(t => { for (let b = 1; b <= 10; b++) r.push([t, b]); });
+  const pick = [...shuffle(f).slice(0, nf), ...shuffle(r).slice(0, n - nf)];
+  /* 3 × 4 e 4 × 3 podem aparecer juntas; a mesma conta idêntica não */
+  const seen = new Set();
+  return shuffle(pick).map(([t, b]) => {
+    let [x, y] = Math.random() < 0.5 ? [t, b] : [b, t];
+    if (seen.has(x + '*' + y)) [x, y] = [y, x];
+    seen.add(x + '*' + y);
+    return mk(x, y, '*');
+  });
+};
+
+/* meta = tempo-meta (em segundos) para a folha de 10 contas */
+const TRACKS = [
+  { id: 'add', name: 'Soma', icon: '+', levels: [
+    { label: 'Soma at\u00e9 5',   meta: 120, build: fromPool(poolAdd(0, 5, 0, 5, 2, 5)) },
+    { label: 'Soma at\u00e9 10',  meta: 150, build: fromPool(poolAdd(1, 9, 1, 9, 5, 10)) },
+    { label: 'Soma at\u00e9 20',  meta: 210, build: fromPool(poolAdd(2, 18, 2, 18, 11, 20)) },
+    { label: 'Soma at\u00e9 50',  meta: 300, build: fromPool(poolAdd(10, 45, 2, 30, 21, 50)) },
+    { label: 'Soma at\u00e9 100', meta: 360, build: fromPool(poolAdd(11, 90, 11, 80, 51, 100)) }
+  ]},
+  { id: 'sub', name: 'Subtra\u00e7\u00e3o', icon: '\u2212', levels: [
+    { label: 'Subtra\u00e7\u00e3o at\u00e9 5',   meta: 150, build: fromPool(poolSub(1, 5, 1, 5, false)) },
+    { label: 'Subtra\u00e7\u00e3o at\u00e9 10',  meta: 180, build: fromPool(poolSub(6, 10, 1, 9, false)) },
+    { label: 'Subtra\u00e7\u00e3o at\u00e9 20',  meta: 240, build: fromPool(poolSub(11, 20, 2, 19, true)) },
+    { label: 'Subtra\u00e7\u00e3o at\u00e9 50',  meta: 330, build: fromPool(poolSub(21, 50, 2, 30, true)) },
+    { label: 'Subtra\u00e7\u00e3o at\u00e9 100', meta: 390, build: fromPool(poolSub(51, 100, 11, 90, true)) }
+  ]},
+  { id: 'mul', name: 'Multiplica\u00e7\u00e3o', icon: '\u00d7', levels: [
+    { label: 'Tabuadas do 1 e do 2',  meta: 150, build: multGen([1, 2], []) },
+    { label: 'Tabuadas do 3 e do 4',  meta: 180, build: multGen([3, 4], [1, 2]) },
+    { label: 'Tabuada do 5',          meta: 210, build: multGen([5], [1, 2, 3, 4]) },
+    { label: 'Tabuadas do 6 e do 7',  meta: 240, build: multGen([6, 7], [1, 2, 3, 4, 5]) },
+    { label: 'Tabuadas do 8, 9 e 10', meta: 270, build: multGen([8, 9, 10], [1, 2, 3, 4, 5, 6, 7]) },
+    { label: 'Todas as tabuadas',     meta: 300, build: multGen([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], []) }
+  ]}
+];
+const TR = id => TRACKS.find(t => t.id === id);
+
+/* ============ estado e armazenamento ============ */
+const KEY = 'caderninho-contas-v1';
+let storageOK = true;
+const defState = () => ({ v: 1, name: '', points: 0, placed: false, lv: { add: 0, sub: 0, mul: 0 }, best: {}, hist: [] });
+
+const num = (v, min, max, def) => Number.isFinite(+v) && v !== null && v !== '' ? Math.min(Math.max(Math.round(+v), min), max) : def;
+function sanitize(o) {
+  const d = defState();
+  if (!o || typeof o !== 'object') return d;
+  d.name = typeof o.name === 'string' ? o.name.slice(0, 20) : '';
+  d.points = num(o.points, 0, 1e9, 0);
+  d.placed = !!o.placed;
+  TRACKS.forEach(t => {
+    const v = o.lv && o.lv[t.id];
+    d.lv[t.id] = Number.isInteger(v) ? Math.min(Math.max(v, 0), t.levels.length) : 0;
+  });
+  if (o.best && typeof o.best === 'object') {
+    Object.keys(o.best).forEach(k => { if (/^(add|sub|mul)\d$/.test(k) && Number.isFinite(o.best[k])) d.best[k] = num(o.best[k], 0, 86400, 0); });
+  }
+  if (Array.isArray(o.hist)) {
+    d.hist = o.hist
+      .filter(h => h && TR(h.t) && Number.isInteger(h.L) && h.L >= 0 && h.L < TR(h.t).levels.length)
+      .slice(-300)
+      .map(h => ({ d: num(h.d, 0, 8.64e15, 0), t: h.t, L: h.L, f: num(h.f, 0, 10, 0), ft: num(h.ft, 0, 86400, 0), tt: num(h.tt, 0, 86400, 0), r: num(h.r, 1, 999, 1), s: num(h.s, 1, 3, 1), a: h.a ? 1 : 0, p: num(h.p, 0, 1000, 0) }));
+  }
+  return d;
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return sanitize(JSON.parse(raw));
+    localStorage.setItem(KEY + '-t', '1'); localStorage.removeItem(KEY + '-t');
+  } catch (e) { storageOK = false; }
+  return defState();
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch (e) { storageOK = false; }
+}
+let state = load();
+
+/* ============ cron\u00f4metro ============ */
+const T = { ms: 0, run: false, last: 0 };
+function tStart() { T.run = true; T.last = performance.now(); }
+function tick() {
+  const n = performance.now();
+  if (T.run && !document.hidden) T.ms += n - T.last;
+  T.last = n;
+  const c = $('#clock');
+  if (c) {
+    c.textContent = fmt(T.ms / 1000);
+    if (screen === 'sheet' && sheet) c.classList.toggle('late', T.ms / 1000 > TR(sheet.t).levels[sheet.L].meta);
+  }
+}
+function tStop() { tick(); T.run = false; }
+setInterval(tick, 250);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) T.last = performance.now(); });
+
+/* ============ modal e aviso ============ */
+function modal(title, body, buttons) {
+  const m = $('#modal');
+  m.innerHTML = `<div class="mbox"><h3>${title}</h3><p>${body}</p><div class="mbtn">${buttons.map((b, i) => `<button class="btn ${b.cls || ''}" data-mi="${i}">${b.label}</button>`).join('')}</div></div>`;
+  m.classList.add('on');
+  m.onclick = e => {
+    const b = e.target.closest('[data-mi]');
+    if (!b) return;
+    const f = buttons[+b.dataset.mi];
+    closeModal();
+    if (f.fn) f.fn();
+  };
+}
+function closeModal() { $('#modal').classList.remove('on'); $('#modal').innerHTML = ''; }
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2400);
+}
+
+/* ============ teclado ============ */
+const keypad = (okLabel) => `<div class="pad">${[1,2,3,4,5,6,7,8,9].map(n => `<button data-act="key" data-k="${n}">${n}</button>`).join('')}<button class="alt" data-act="key" data-k="back" aria-label="Apagar">\u232b</button><button data-act="key" data-k="0">0</button><button class="go" data-act="key" data-k="ok" aria-label="Pr\u00f3xima conta">${okLabel}</button></div>`;
+
+/* ============ in\u00edcio ============ */
+let screen = 'home', sheet = null, pt = null;
+
+function viewHome() {
+  screen = 'home'; sheet = null; pt = null;
+  window.scrollTo(0, 0);
+  const cards = TRACKS.map(tr => {
+    const L = state.lv[tr.id], n = tr.levels.length, done = L >= n;
+    const lvl = tr.levels[Math.min(L, n - 1)];
+    const dots = tr.levels.map((_, i) => `<i class="dot ${i < L ? 'full' : i === L ? 'cur' : ''}"></i>`).join('');
+    return `<section class="card trk"><div class="ico">${tr.icon}</div><div class="info"><h3>${tr.name}</h3><p>${done ? 'Trilha conclu\u00edda! \ud83c\udf89' : `Fase ${L + 1} de ${n}: ${lvl.label}`}</p><div class="dots">${dots}</div></div><button class="btn primary" data-act="start" data-t="${tr.id}">${done ? 'Treinar' : 'Come\u00e7ar'}</button></section>`;
+  }).join('');
+  const banner = state.placed ? '' : `<section class="card hl"><h3>Vamos descobrir por onde come\u00e7ar?</h3><p>Um teste r\u00e1pido de contas mostra a fase certa de cada trilha.</p><button class="btn primary block" data-act="test">Fazer o teste de n\u00edvel</button></section>`;
+  const warn = storageOK ? '' : `<p class="note">Este navegador n\u00e3o est\u00e1 guardando o progresso. Use \u201cExportar\u201d na \u00c1rea dos pais para n\u00e3o perder nada.</p>`;
+  app.innerHTML = `<main class="wrap">
+    <div class="hello"><h1>Ol\u00e1${state.name ? ', ' + esc(state.name) : ''}!</h1><div class="pts">\u2b50 ${state.points}</div></div>
+    ${banner}${cards}${warn}
+    <div class="links">${state.placed ? '<button class="btn line" data-act="test">Refazer teste de n\u00edvel</button>' : ''}<button class="btn line" data-act="parents">\u00c1rea dos pais</button></div>
+  </main>`;
+}
+
+/* ============ folha de exerc\u00edcios ============ */
+function startSheet(t) {
+  const tr = TR(t), n = tr.levels.length;
+  const practice = state.lv[t] >= n;
+  const L = Math.min(state.lv[t], n - 1);
+  const items = tr.levels[L].build(10).map(x => ({ ...x, val: '', ok: false, fresh: false }));
+  sheet = { t, L, practice, items, sel: 0, phase: 'fill', first: null, rounds: 0, res: null };
+  T.ms = 0; tStart();
+  viewSheet();
+}
+function viewSheet() {
+  screen = 'sheet';
+  window.scrollTo(0, 0);
+  const lv = TR(sheet.t).levels[sheet.L];
+  app.innerHTML = `<header class="shead"><button class="ghost" data-act="exit" aria-label="Sair">\u2715</button><div class="ttl"><b>${lv.label}</b><small>Meta: ${fmt(lv.meta)}</small></div><div class="clock" id="clock">${fmt(T.ms / 1000)}</div></header>
+  <main class="wrap sheetwrap"><div class="paper" id="rows"></div></main>
+  <div class="dock"><div class="bar" id="bar"></div>${keypad('\u2713')}</div>`;
+  paintSheet();
+}
+function paintSheet() {
+  const its = sheet.items, review = sheet.phase === 'review';
+  $('#rows').innerHTML = its.map((it, i) => {
+    const c = ['row'];
+    if (it.ok) c.push('ok'); else if (review) c.push('review');
+    if (i === sheet.sel && !it.ok) c.push('sel');
+    return `<div class="${c.join(' ')}" data-act="sel" data-i="${i}"><span class="n">${i + 1}</span><span class="eq">${it.a} ${OP[it.op]} ${it.b} =</span><span class="box">${it.val}</span><span class="mk">${it.ok ? '\u2713' : review ? '\u270e' : ''}</span></div>`;
+  }).join('');
+  const bad = its.filter(i => !i.ok).length;
+  const empty = its.some(i => !i.ok && i.val === '');
+  const filled = its.filter(i => i.val !== '').length;
+  $('#bar').innerHTML = `<span>${review ? (bad === 1 ? '1 conta para olhar de novo' : bad + ' contas para olhar de novo') : filled + ' de 10 preenchidas'}</span><button class="btn primary" data-act="submit" ${empty ? 'disabled' : ''}>${review ? 'Conferir' : 'Entregar'}</button>`;
+  keepVisible();
+}
+function keepVisible() {
+  const el = document.querySelector('.row.sel');
+  if (!el) return;
+  const top = $('.shead').getBoundingClientRect().bottom + 8;
+  const bottom = $('.dock').getBoundingClientRect().top - 8;
+  const r = el.getBoundingClientRect();
+  if (r.bottom > bottom) window.scrollBy({ top: r.bottom - bottom, behavior: 'smooth' });
+  else if (r.top < top) window.scrollBy({ top: r.top - top, behavior: 'smooth' });
+}
+function selectRow(i) {
+  const it = sheet.items[i];
+  if (!it || it.ok) return;
+  sheet.sel = i; it.fresh = it.val !== '';
+  paintSheet();
+}
+function nextSel() {
+  const n = sheet.items.length, order = [];
+  for (let s = 1; s <= n; s++) order.push((sheet.sel + s) % n);
+  let j;
+  if (sheet.phase === 'fill') j = order.find(i => sheet.items[i].val === '');
+  if (j === undefined) j = order.find(i => !sheet.items[i].ok);
+  if (j === undefined) return;
+  selectRow(j);
+}
+function sheetKey(k) {
+  if (!sheet || sheet.phase === 'done') return;
+  if (k === 'ok') { nextSel(); return; }
+  const it = sheet.items[sheet.sel];
+  if (!it || it.ok) return;
+  if (k === 'back') { it.val = it.val.slice(0, -1); it.fresh = false; }
+  else { if (it.fresh) { it.val = ''; it.fresh = false; } if (it.val.length < 3) it.val += k; }
+  paintSheet();
+}
+function submitSheet() {
+  const its = sheet.items;
+  if (its.some(i => !i.ok && i.val === '')) return;
+  its.forEach(it => { it.ok = it.val !== '' && Number(it.val) === it.ans; });
+  const good = its.filter(i => i.ok).length, bad = 10 - good;
+  sheet.rounds++;
+  tStop();
+  if (!sheet.first) sheet.first = { time: T.ms / 1000, correct: good };
+  if (bad === 0) { finishSheet(); return; }
+  let title, body;
+  if (sheet.rounds === 1) {
+    title = good === 0 ? 'Vamos juntos!' : `Voc\u00ea acertou ${good} de 10!`;
+    body = bad === 1 ? 'Olhe com calma a conta marcada em amarelo e confira de novo.' : `Olhe com calma as ${bad} contas marcadas em amarelo e confira de novo.`;
+  } else {
+    title = `J\u00e1 s\u00e3o ${good} de 10 certas!`;
+    body = bad === 1 ? 'Falta s\u00f3 1 conta. Voc\u00ea est\u00e1 quase l\u00e1!' : `Faltam ${bad} contas. Respire e tente de novo.`;
+  }
+  modal(title, body, [{ label: 'Ver as contas', cls: 'primary', fn: () => {
+    sheet.phase = 'review';
+    its.forEach(it => { if (!it.ok) it.fresh = it.val !== ''; });
+    const first = its.findIndex(i => !i.ok);
+    sheet.sel = first;
+    tStart();
+    paintSheet();
+  }}]);
+}
+function finishSheet() {
+  tStop();
+  const total = T.ms / 1000, tr = TR(sheet.t), lvl = tr.levels[sheet.L];
+  const within = total <= lvl.meta;
+  const perfect = sheet.first.correct === 10;
+  const stars = within ? (perfect ? 3 : 2) : 1;
+  const advanced = within && !sheet.practice;
+  const key = sheet.t + sheet.L, prev = state.best[key];
+  const record = prev !== undefined && total < prev;
+  if (prev === undefined || total < prev) state.best[key] = Math.round(total);
+  let pts = 0;
+  if (advanced) {
+    pts = 100 + (stars - 1) * 10 + (record ? 20 : 0);
+    state.points += pts;
+    state.lv[sheet.t] = sheet.L + 1;
+  }
+  state.hist.push({ d: Date.now(), t: sheet.t, L: sheet.L, f: sheet.first.correct, ft: Math.round(sheet.first.time), tt: Math.round(total), r: sheet.rounds, s: stars, a: advanced ? 1 : 0, p: pts });
+  if (state.hist.length > 300) state.hist = state.hist.slice(-300);
+  save();
+  sheet.phase = 'done';
+  sheet.res = { total, within, stars, advanced, pts, record, perfect };
+  viewDone();
+}
+function viewDone() {
+  screen = 'done';
+  window.scrollTo(0, 0);
+  const r = sheet.res, tr = TR(sheet.t), lvl = tr.levels[sheet.L], n = tr.levels.length;
+  const starsHtml = [1, 2, 3].map(i => `<span class="${i <= r.stars ? '' : 'off'}">\u2605</span>`).join('');
+  let title, sub, cta;
+  if (r.advanced) {
+    const concluded = state.lv[sheet.t] >= n;
+    title = concluded ? `Trilha de ${tr.name} conclu\u00edda! \ud83c\udf89` : 'Voc\u00ea subiu de fase! \ud83d\ude80';
+    sub = concluded ? 'Voc\u00ea dominou todas as fases desta trilha.' : `Pr\u00f3xima fase: ${tr.levels[state.lv[sheet.t]].label}.`;
+    cta = concluded ? 'Continuar treinando' : 'Pr\u00f3xima fase';
+  } else if (sheet.practice) {
+    title = 'Treino conclu\u00eddo!'; sub = 'Voc\u00ea acertou tudo. Continue treinando para ficar cada vez mais r\u00e1pido.'; cta = 'Mais uma folha';
+  } else {
+    title = 'Voc\u00ea acertou tudo! \ud83c\udf1f';
+    sub = 'Mais uma rodadinha para ficar bem r\u00e1pido e a gente sobe de fase.';
+    cta = 'Mais uma rodadinha';
+  }
+  app.innerHTML = `<main class="wrap center">
+    <div class="stars" aria-label="${r.stars} de 3 estrelas">${starsHtml}</div>
+    <h1 class="big-t">${title}</h1>
+    <p class="sub-t">${sub}</p>
+    ${r.advanced ? `<div class="badge">+${r.pts} pontos</div>` : ''}
+    ${r.record ? '<div class="badge">\u23f1\ufe0f Novo recorde de tempo!</div>' : ''}
+    <div class="stats">
+      <div class="stat"><small>1\u00aa entrega</small><b>${sheet.first.correct} de 10</b></div>
+      <div class="stat"><small>Tempo da 1\u00aa entrega</small><b>${fmt(sheet.first.time)}</b></div>
+      <div class="stat"><small>Tempo total</small><b>${fmt(r.total)}</b></div>
+      <div class="stat"><small>Meta da fase</small><b>${fmt(lvl.meta)}</b></div>
+    </div>
+    <div class="stack"><button class="btn primary block" data-act="start" data-t="${sheet.t}">${cta}</button><button class="btn line block" data-act="home">Voltar ao in\u00edcio</button></div>
+  </main>`;
+}
+function exitSheet() {
+  tStop();
+  modal('Sair desta folha?', 'O tempo e as respostas desta folha n\u00e3o ser\u00e3o guardados.', [
+    { label: 'Continuar folha', cls: 'primary', fn: () => tStart() },
+    { label: 'Sair', cls: 'line', fn: viewHome }
+  ]);
+}
+
+/* ============ teste de n\u00edvel ============ */
+function viewTestIntro() {
+  screen = 'testintro';
+  window.scrollTo(0, 0);
+  const tr = TRACKS[pt.ti];
+  const first = pt.ti === 0;
+  app.innerHTML = `<main class="wrap center">
+    <div class="ico" style="margin:30px auto 14px;width:72px;height:72px;font-size:42px">${tr.icon}</div>
+    <h1 class="big-t">${first ? 'Teste de n\u00edvel' : 'Agora vamos de ' + tr.name}</h1>
+    <p class="sub-t">${first ? 'S\u00e3o contas r\u00e1pidas para o app saber em qual fase come\u00e7ar. Responda o que souber e, se n\u00e3o souber alguma, toque em \u201cPular\u201d. Sem pressa e sem preocupa\u00e7\u00e3o.' : 'Mesma ideia: responda o que souber e pule o que n\u00e3o souber.'}</p>
+    <p class="sub-t"><b>${tr.name}</b></p>
+    <div class="stack"><button class="btn primary block" data-act="testgo">Vamos l\u00e1</button><button class="btn line block" data-act="${first ? 'home' : 'stoptest'}">${first ? 'Agora n\u00e3o' : 'Parar o teste'}</button></div>
+  </main>`;
+}
+function startTest() { pt = { ti: 0, li: 0, res: {}, q: [], qi: 0, ok: 0, val: '' }; viewTestIntro(); }
+function beginStage() {
+  const lv = TRACKS[pt.ti].levels[pt.li];
+  pt.q = lv.build(4); pt.qi = 0; pt.ok = 0; pt.val = '';
+  T.ms = 0; tStart();
+  viewTest();
+}
+function viewTest() {
+  screen = 'test';
+  window.scrollTo(0, 0);
+  const tr = TRACKS[pt.ti];
+  app.innerHTML = `<header class="shead"><button class="ghost" data-act="stoptest">Parar</button><div class="ttl"><b>Teste de n\u00edvel</b><small>${tr.name}</small></div><div class="spacer"></div></header>
+  <main class="wrap testwrap"><div class="qdots" id="qd"></div><div class="bigq" id="bq"></div></main>
+  <div class="dock"><div class="bar"><button class="btn line" data-act="skipq">Pular</button><span></span></div>${keypad('OK')}</div>`;
+  paintTest();
+}
+function paintTest() {
+  const q = pt.q[pt.qi];
+  $('#qd').innerHTML = [0, 1, 2, 3].map(i => `<i class="${i < pt.qi ? 'done' : ''}"></i>`).join('');
+  $('#bq').innerHTML = `<span>${q.a} ${OP[q.op]} ${q.b} =</span><span class="box big">${pt.val}</span>`;
+}
+function testKey(k) {
+  if (k === 'ok') { if (pt.val !== '') answerQ(false); return; }
+  if (k === 'back') pt.val = pt.val.slice(0, -1);
+  else if (pt.val.length < 3) pt.val += k;
+  paintTest();
+}
+function answerQ(skip) {
+  const q = pt.q[pt.qi];
+  if (!skip && pt.val !== '' && Number(pt.val) === q.ans) pt.ok++;
+  pt.qi++; pt.val = '';
+  if (pt.qi < 4) { paintTest(); return; }
+  tStop();
+  const tr = TRACKS[pt.ti], lv = tr.levels[pt.li];
+  const pass = pt.ok >= 3 && T.ms / 1000 <= lv.meta * 0.5;
+  if (pass) {
+    pt.li++;
+    if (pt.li >= tr.levels.length) { pt.res[tr.id] = pt.li; nextTrack(); }
+    else beginStage();
+  } else { pt.res[tr.id] = pt.li; nextTrack(); }
+}
+function nextTrack() {
+  pt.ti++; pt.li = 0;
+  if (pt.ti >= TRACKS.length) endTest();
+  else viewTestIntro();
+}
+function endTest() {
+  tStop();
+  const ids = Object.keys(pt.res);
+  ids.forEach(id => { state.lv[id] = pt.res[id]; });
+  if (ids.length) { state.placed = true; save(); }
+  viewTestResult(pt.res);
+}
+function viewTestResult(res) {
+  screen = 'testresult';
+  window.scrollTo(0, 0);
+  const rows = TRACKS.map(tr => {
+    if (!(tr.id in res)) return `<div class="hrow"><b>${tr.name}</b><span class="r">n\u00e3o testada</span></div>`;
+    const L = res[tr.id];
+    return `<div class="hrow"><b>${tr.name}</b><span class="r">${L >= tr.levels.length ? 'trilha completa' : 'come\u00e7a em: ' + tr.levels[L].label}</span></div>`;
+  }).join('');
+  app.innerHTML = `<main class="wrap center">
+    <h1 class="big-t" style="margin-top:24px">Pronto! \ud83c\udf89</h1>
+    <p class="sub-t">Estes s\u00e3o os pontos de partida de cada trilha:</p>
+    <div class="card" style="text-align:left">${rows}</div>
+    <p class="note">Os pais podem ajustar qualquer fase na \u00c1rea dos pais.</p>
+    <div class="stack"><button class="btn primary block" data-act="home">Ir para o in\u00edcio</button></div>
+  </main>`;
+}
+function stopTest() {
+  tStop();
+  modal('Parar o teste?', 'As trilhas j\u00e1 testadas ficam salvas. As outras continuam como estavam.', [
+    { label: 'Continuar', cls: 'primary', fn: () => { if (screen === 'test') tStart(); } },
+    { label: 'Parar', cls: 'line', fn: () => endTest() }
+  ]);
+}
+
+/* ============ \u00e1rea dos pais ============ */
+const PREFIX = 'CADERNINHO1:';
+const encode = () => PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+function decode(code) {
+  code = String(code).trim();
+  if (!code.startsWith(PREFIX)) throw new Error('prefixo');
+  return sanitize(JSON.parse(decodeURIComponent(escape(atob(code.slice(PREFIX.length))))));
+}
+function viewParents() {
+  screen = 'parents';
+  window.scrollTo(0, 0);
+  const h = state.hist;
+  const adv = h.filter(x => x.a).length;
+  const recent = h.slice(-12).reverse().map(x => {
+    const dt = x.d ? new Date(x.d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '--';
+    return `<div class="hrow"><div><b>${esc(TR(x.t).levels[x.L].label)}</b><br><span class="r" style="white-space:normal">1\u00aa entrega: ${x.f}/10 em ${fmt(x.ft)} \u00b7 total ${fmt(x.tt)}</span></div><div class="r">${dt}<br>${'\u2605'.repeat(x.s)}${x.a ? ' \u2191' : ''}</div></div>`;
+  }).join('') || '<p class="note">Ainda n\u00e3o h\u00e1 folhas conclu\u00eddas.</p>';
+  const selects = TRACKS.map(tr => `<label class="f" for="lv-${tr.id}">${tr.name}</label><select id="lv-${tr.id}" data-lv="${tr.id}">${tr.levels.map((l, i) => `<option value="${i}" ${state.lv[tr.id] === i ? 'selected' : ''}>Fase ${i + 1}: ${l.label}</option>`).join('')}<option value="${tr.levels.length}" ${state.lv[tr.id] >= tr.levels.length ? 'selected' : ''}>Trilha conclu\u00edda</option></select>`).join('');
+  app.innerHTML = `<main class="wrap">
+    <div class="hello"><h1>\u00c1rea dos pais</h1><button class="btn line" data-act="home">Voltar</button></div>
+    <section class="card"><h3>Resumo</h3><div class="sum"><div><small>Folhas</small><b>${h.length}</b></div><div><small>Fases vencidas</small><b>${adv}</b></div><div><small>Pontos</small><b>${state.points}</b></div></div></section>
+    <section class="card"><h3>Perfil</h3><label class="f" for="nm">Apelido (opcional)</label><input type="text" id="nm" maxlength="20" value="${esc(state.name)}" autocomplete="off"><p class="note" style="text-align:left">Use s\u00f3 um apelido. Tudo fica guardado apenas neste aparelho.</p></section>
+    <section class="card"><h3>Fase de cada trilha</h3><p>Ajuste manualmente se achar que a crian\u00e7a est\u00e1 pronta (ou n\u00e3o).</p>${selects}</section>
+    <section class="card"><h3>\u00daltimas folhas</h3>${recent}</section>
+    <section class="card"><h3>Backup do progresso</h3><p>Gere o c\u00f3digo, copie e guarde em um lugar seguro (notas, e-mail para voc\u00ea mesmo). Para restaurar, cole o c\u00f3digo abaixo.</p>
+      <button class="btn block" data-act="export">Gerar c\u00f3digo de backup</button>
+      <textarea id="code" placeholder="O c\u00f3digo aparece aqui. Para importar, cole um c\u00f3digo e toque em Importar." spellcheck="false"></textarea>
+      <div class="mbtn" style="margin-top:8px"><button class="btn" data-act="copy">Copiar</button><button class="btn" data-act="import">Importar</button></div>
+    </section>
+    <section class="card"><h3>Recome\u00e7ar</h3><p>Apaga pontos, fases e hist\u00f3rico deste aparelho.</p><button class="btn line block" data-act="reset">Apagar tudo</button></section>
+  </main>`;
+}
+async function copyCode() {
+  const ta = $('#code');
+  if (!ta.value) { toast('Gere o c\u00f3digo primeiro'); return; }
+  try { await navigator.clipboard.writeText(ta.value); toast('C\u00f3digo copiado!'); }
+  catch (e) {
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); toast('C\u00f3digo copiado!'); } catch (_) { toast('Selecione o texto e copie manualmente'); }
+  }
+}
+function importCode() {
+  let next;
+  try { next = decode($('#code').value); } catch (e) { toast('C\u00f3digo n\u00e3o reconhecido'); return; }
+  modal('Importar progresso?', 'O progresso atual deste aparelho ser\u00e1 substitu\u00eddo pelo do c\u00f3digo.', [
+    { label: 'Importar', cls: 'primary', fn: () => { state = next; save(); toast('Progresso importado'); viewParents(); } },
+    { label: 'Cancelar', cls: 'line' }
+  ]);
+}
+function resetAll() {
+  modal('Apagar tudo?', 'Pontos, fases e hist\u00f3rico ser\u00e3o apagados. Fa\u00e7a um backup antes se quiser guardar.', [
+    { label: 'Apagar', cls: 'primary', fn: () => { state = defState(); save(); viewHome(); } },
+    { label: 'Cancelar', cls: 'line' }
+  ]);
+}
+
+/* ============ eventos ============ */
+const actions = {
+  home: viewHome,
+  parents: viewParents,
+  start: d => startSheet(d.t),
+  test: startTest,
+  testgo: beginStage,
+  stoptest: stopTest,
+  skipq: () => answerQ(true),
+  exit: exitSheet,
+  submit: submitSheet,
+  sel: d => selectRow(+d.i),
+  key: d => { if (screen === 'sheet') sheetKey(d.k); else if (screen === 'test') testKey(d.k); },
+  export: () => { $('#code').value = encode(); toast('C\u00f3digo gerado'); },
+  copy: copyCode,
+  import: importCode,
+  reset: resetAll
+};
+document.addEventListener('click', e => {
+  if ($('#modal').classList.contains('on')) return;
+  const el = e.target.closest('[data-act]');
+  if (el && actions[el.dataset.act]) actions[el.dataset.act](el.dataset);
+});
+document.addEventListener('change', e => {
+  const id = e.target.dataset && e.target.dataset.lv;
+  if (id && TR(id)) { state.lv[id] = +e.target.value; state.placed = true; save(); toast('Fase atualizada'); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'nm') { state.name = e.target.value.slice(0, 20); save(); }
+});
+document.addEventListener('keydown', e => {
+  if ($('#modal').classList.contains('on')) return;
+  if (e.target.matches && e.target.matches('input,textarea,select')) return;
+  if (screen !== 'sheet' && screen !== 'test') return;
+  const k = /^\d$/.test(e.key) ? e.key : e.key === 'Backspace' ? 'back' : e.key === 'Enter' ? 'ok' : null;
+  if (!k) return;
+  if (screen === 'sheet') sheetKey(k); else testKey(k);
+});
+
+viewHome();
+</script>
+</body>
+</html>
