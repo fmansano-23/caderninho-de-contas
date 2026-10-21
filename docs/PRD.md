@@ -58,7 +58,7 @@ O Caderninho de Contas é um app em HTML, pensado para celular, que treina soma,
 
 ## 7. Trilhas e níveis
 
-Cada folha tem **10 contas** sorteadas dentro do intervalo do nível. O tempo-meta é de **1:30 por folha** (tempo total, incluindo correções) e vale para todos os níveis. Para subir de nível, a criança precisa fazer **3 folhas seguidas, cada uma com 10/10 e dentro do tempo-meta**.
+Cada folha tem **10 contas** sorteadas dentro do intervalo do nível. O tempo-meta padrão é de **1:30 por folha** (tempo total, incluindo correções). Os pais ajustam o tempo de cada trilha na Área dos pais (de 0:45 a 5:00); o valor vale para todos os níveis da trilha. Para subir de nível, a criança precisa fazer **3 folhas seguidas, cada uma com 10/10 e dentro do tempo-meta**.
 
 ### Soma (resultado da conta)
 | Nível | Resultados |
@@ -83,15 +83,17 @@ O resultado nunca é negativo.
 ### Multiplicação
 | Nível | Conteúdo |
 |---|---|
-| 1 | Tabuadas do 1, 2 e 3 |
-| 2 | Tabuadas do 4, 5 e 6 |
-| 3 | Tabuadas do 7, 8 e 9 |
-| 4 | Tabuada do 10 e todas as tabuadas misturadas |
+| 1 | Tabuadas do 1 e 2 |
+| 2 | Tabuadas do 3 e 4 |
+| 3 | Tabuada do 5 |
+| 4 | Tabuadas do 6 e 7 |
+| 5 | Tabuadas do 8 e 9 |
+| 6 | Tabuada do 10 e todas as tabuadas misturadas |
 
 Cada tabuada vai de 1 a 10 (por exemplo, a do 3 vai de 3 × 1 a 3 × 10).
 
 Observações:
-- A meta de 1:30 é uma estimativa inicial e deve ser calibrada com uso real (ponto em aberto 1).
+- A meta de 1:30 é uma estimativa inicial. Como os pais podem ajustá-la por trilha, a calibração acontece com uso real (ponto em aberto 1).
 - Cada folha sorteia contas novas dentro do nível. A repetição que constrói fluência acontece entre folhas: a criança refaz o nível até dominar.
 - Na multiplicação, a ordem dos fatores é sorteada (3 × 4 ou 4 × 3). As duas ordens podem aparecer na mesma folha, mas a mesma conta idêntica nunca se repete.
 - Folha fora da meta zera a contagem de folhas rápidas do nível (3 seguidas). A mensagem é sempre positiva.
@@ -147,6 +149,7 @@ A tela de resultado mostra: estrelas, 1ª entrega (acertos e tempo), tempo total
 - Resumo: folhas feitas, níveis vencidos, pontos.
 - Apelido da criança (opcional, até 20 caracteres).
 - Ajuste manual do nível de cada trilha (zera a contagem de folhas rápidas).
+- Tempo-meta por folha de cada trilha (0:45 a 5:00). A mudança vale já para a próxima folha e não zera a contagem de folhas rápidas.
 - Últimas 12 folhas (data, nível, acertos e tempo da 1ª entrega, tempo total, estrelas, indicador de avanço).
 - Backup: gerar código, copiar, importar (com confirmação).
 - Apagar tudo (com confirmação).
@@ -170,13 +173,13 @@ A tela de resultado mostra: estrelas, 1ª entrega (acertos e tempo), tempo total
 | RF-03 | Cronômetro com pausa em segundo plano e no feedback | Alta |
 | RF-04 | Avaliação de todas as contas a cada conferência | Alta |
 | RF-05 | Destaque das contas a revisar sem revelar a resposta | Alta |
-| RF-06 | Regra de avanço: 3 folhas seguidas com 100% de acertos e tempo total ≤ 1:30; folha fora da meta zera a contagem | Alta |
+| RF-06 | Regra de avanço: 3 folhas seguidas com 100% de acertos e tempo total ≤ tempo-meta da trilha (padrão 1:30); folha fora da meta zera a contagem | Alta |
 | RF-07 | Pontos, estrelas e recorde de tempo | Alta |
 | RF-08 | Histórico de folhas (últimas 300) | Alta |
 | RF-09 | Salvamento local e restauração ao abrir | Alta |
 | RF-10 | Teste de nível por trilha | Alta |
 | RF-11 | Backup por código (exportar/importar) com validação | Alta |
-| RF-12 | Ajuste manual de nível pelos pais | Média |
+| RF-12 | Ajuste manual de nível e do tempo-meta pelos pais | Média |
 | RF-13 | Modo treino em trilha concluída | Média |
 | RF-14 | Suporte a teclado físico (desktop) | Baixa |
 | RF-15 | Tema claro e escuro automáticos | Baixa |
@@ -215,6 +218,7 @@ Armazenado em `localStorage`, chave `caderninho-contas-v2`. A versão 2 (níveis
   "placed": false,
   "lv": { "add": 0, "sub": 0, "mul": 0 },
   "st": { "add": 0, "sub": 0, "mul": 0 },
+  "goal": { "add": 90, "sub": 90, "mul": 90 },
   "best": { "add2": 140 },
   "hist": [
     { "d": 1760000000000, "t": "add", "L": 2, "f": 8, "ft": 130, "tt": 185, "r": 2, "s": 2, "a": 1, "p": 110 }
@@ -226,6 +230,7 @@ Armazenado em `localStorage`, chave `caderninho-contas-v2`. A versão 2 (níveis
 |---|---|
 | `lv[trilha]` | Índice do nível atual (0 a N-1). Valor igual a N = trilha concluída |
 | `st[trilha]` | Folhas rápidas seguidas no nível atual (0 a 2) |
+| `goal[trilha]` | Tempo-meta por folha, em segundos (30 a 900; padrão 90) |
 | `best["<trilha><nível>"]` | Melhor tempo total (s) naquele nível |
 | `hist[].d` | Timestamp |
 | `hist[].t` / `L` | Trilha (`add`, `sub`, `mul`) e nível (índice) |
@@ -276,7 +281,7 @@ Limitações conhecidas:
 6. Regras para evitar "forçar" resposta por tentativa e erro nas correções (ex.: limite de tentativas ou dica após N conferências).
 7. Pontos por consistência (ex.: dias seguidos), sem punir ausência.
 8. As 3 folhas rápidas são seguidas (uma folha lenta zera a contagem) ou acumuladas? Hoje são seguidas; avaliar se zerar desmotiva a criança.
-9. A meta única de 1:30 serve para todos os níveis? Níveis altos de soma e subtração (81 a 100) podem exigir meta maior.
+9. A meta é única por trilha (todos os níveis). Níveis altos de soma e subtração (81 a 100) podem pedir meta maior que os iniciais: avaliar meta por nível.
 
 ## 17. Roadmap sugerido
 
@@ -303,7 +308,7 @@ Limitações conhecidas:
 - [ ] Uma folha gera 10 contas válidas, sem conta idêntica repetida, dentro do domínio do nível.
 - [ ] Nenhum texto da interface usa as palavras proibidas do guia de tom.
 - [ ] A conta marcada para revisão nunca exibe a resposta correta.
-- [ ] O nível só sobe após 3 folhas seguidas com 10/10 e tempo total ≤ 1:30; uma folha fora da meta zera a contagem.
+- [ ] O nível só sobe após 3 folhas seguidas com 10/10 e tempo total ≤ tempo-meta; uma folha fora da meta zera a contagem.
 - [ ] Os pontos são concedidos uma única vez por avanço.
 - [ ] O progresso persiste após fechar e reabrir o app.
 - [ ] Exportar e importar em outro aparelho restaura pontos, níveis, folhas rápidas e histórico.
@@ -333,7 +338,7 @@ Limitações conhecidas:
 ## 20. Notas para continuar na IDE
 
 - O protótipo está em arquivo único para facilitar a validação. Ao migrar, sugere-se separar: `data/levels.js` (trilhas, níveis e metas), `core/` (geradores, avaliação, pontuação, teste de nível), `storage.js` (persistência, backup e sanitização) e `ui/` (telas).
-- A meta de tempo (`GOAL`), o número de folhas seguidas (`NEED`) e as faixas de cada nível estão centralizados no topo do script (`GOAL`, `NEED`, `TRACKS`); é o primeiro lugar a ajustar durante a calibração.
+- O tempo-meta padrão (`GOAL`, ajustável por trilha em `state.goal`), o número de folhas seguidas (`NEED`) e as faixas de cada nível estão centralizados no topo do script (`GOAL`, `NEED`, `TRACKS`); é o primeiro lugar a ajustar durante a calibração.
 - A lógica de avanço está em `finishSheet()`, o teste de nível em `answerQ()`/`endTest()` e a sanitização em `sanitize()`.
 - Manter a regra de copy (seção 12) como lint: um teste simples que procura as palavras proibidas nos textos da interface.
 - Se evoluir para framework (React, Vue, Svelte), manter a persistência com a mesma chave e o mesmo formato para não perder backups existentes.

@@ -194,7 +194,9 @@ const fmt = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + '
 const OP = { '+': '+', '-': '\u2212', '*': '\u00d7' };
 
 /* ============ trilhas e n\u00edveis ============ */
-const GOAL = 90;  /* tempo-meta (s) de uma folha de 10 contas */
+const GOAL = 90;  /* tempo-meta padr\u00e3o (s) de uma folha de 10 contas; os pais ajustam por trilha */
+const GOALS = [45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
+const goalOf = t => state.goal[t];
 const NEED = 3;   /* folhas seguidas dentro da meta para subir de n\u00edvel */
 const mk = (a, b, op) => ({ a, b, op, ans: op === '+' ? a + b : op === '-' ? a - b : a * b });
 /* soma: resultado entre lo e hi; parcelas a partir de min */
@@ -226,17 +228,19 @@ const multGen = focus => n => {
 /* n\u00edvel 1 = at\u00e9 20; depois de 21 a 40, 41 a 60, 61 a 80 e 81 a 100 */
 const rangeLevels = (word, pool) => [1, 2, 3, 4, 5].map(k => {
   const lo = k === 1 ? 2 : (k - 1) * 20 + 1, hi = k * 20, min = k === 1 ? 1 : 2;
-  return { label: k === 1 ? `${word} at\u00e9 20` : `${word} de ${lo} a ${hi}`, meta: GOAL, build: fromPool(pool(lo, hi, min)) };
+  return { label: k === 1 ? `${word} at\u00e9 20` : `${word} de ${lo} a ${hi}`, build: fromPool(pool(lo, hi, min)) };
 });
 
 const TRACKS = [
   { id: 'add', name: 'Soma', icon: '+', levels: rangeLevels('Soma', poolAdd) },
   { id: 'sub', name: 'Subtra\u00e7\u00e3o', icon: '\u2212', levels: rangeLevels('Subtra\u00e7\u00e3o', poolSub) },
   { id: 'mul', name: 'Multiplica\u00e7\u00e3o', icon: '\u00d7', levels: [
-    { label: 'Tabuadas do 1, 2 e 3',             meta: GOAL, build: multGen([1, 2, 3]) },
-    { label: 'Tabuadas do 4, 5 e 6',             meta: GOAL, build: multGen([4, 5, 6]) },
-    { label: 'Tabuadas do 7, 8 e 9',             meta: GOAL, build: multGen([7, 8, 9]) },
-    { label: 'Tabuada do 10 e todas misturadas', meta: GOAL, build: multGen([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) }
+    { label: 'Tabuadas do 1 e 2',                build: multGen([1, 2]) },
+    { label: 'Tabuadas do 3 e 4',                build: multGen([3, 4]) },
+    { label: 'Tabuada do 5',                     build: multGen([5]) },
+    { label: 'Tabuadas do 6 e 7',                build: multGen([6, 7]) },
+    { label: 'Tabuadas do 8 e 9',                build: multGen([8, 9]) },
+    { label: 'Tabuada do 10 e todas misturadas', build: multGen([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) }
   ]}
 ];
 const TR = id => TRACKS.find(t => t.id === id);
@@ -244,7 +248,7 @@ const TR = id => TRACKS.find(t => t.id === id);
 /* ============ estado e armazenamento ============ */
 const KEY = 'caderninho-contas-v2';
 let storageOK = true;
-const defState = () => ({ v: 2, name: '', points: 0, placed: false, lv: { add: 0, sub: 0, mul: 0 }, st: { add: 0, sub: 0, mul: 0 }, best: {}, hist: [] });
+const defState = () => ({ v: 2, name: '', points: 0, placed: false, lv: { add: 0, sub: 0, mul: 0 }, st: { add: 0, sub: 0, mul: 0 }, goal: { add: GOAL, sub: GOAL, mul: GOAL }, best: {}, hist: [] });
 
 const num = (v, min, max, def) => Number.isFinite(+v) && v !== null && v !== '' ? Math.min(Math.max(Math.round(+v), min), max) : def;
 function sanitize(o) {
@@ -257,6 +261,7 @@ function sanitize(o) {
     const v = o.lv && o.lv[t.id];
     d.lv[t.id] = Number.isInteger(v) ? Math.min(Math.max(v, 0), t.levels.length) : 0;
     d.st[t.id] = num(o.st && o.st[t.id], 0, NEED - 1, 0);
+    d.goal[t.id] = num(o.goal && o.goal[t.id], 30, 900, GOAL);
   });
   if (o.best && typeof o.best === 'object') {
     Object.keys(o.best).forEach(k => { if (/^(add|sub|mul)\d$/.test(k) && Number.isFinite(o.best[k])) d.best[k] = num(o.best[k], 0, 86400, 0); });
@@ -293,7 +298,7 @@ function tick() {
   const c = $('#clock');
   if (c) {
     c.textContent = fmt(T.ms / 1000);
-    if (screen === 'sheet' && sheet) c.classList.toggle('late', T.ms / 1000 > TR(sheet.t).levels[sheet.L].meta);
+    if (screen === 'sheet' && sheet) c.classList.toggle('late', T.ms / 1000 > goalOf(sheet.t));
   }
 }
 function tStop() { tick(); T.run = false; }
@@ -355,7 +360,7 @@ function viewLevels(t) {
     const note = k === 'done' ? 'Feito. Toque para treinar de novo' : k === 'cur' ? `Folhas r\u00e1pidas: ${state.st[t]} de ${NEED}` : 'Abre quando voc\u00ea passar o n\u00edvel azul';
     return `<button class="lvl ${k}" ${k === 'lock' ? 'disabled' : `data-act="start" data-t="${t}" data-l="${i}"`}><span class="lm" aria-hidden="true">${mark}</span><span class="lt"><b>N\u00edvel ${i + 1}</b><small>${lv.label}</small><small>${note}</small></span></button>`;
   }).join('');
-  app.innerHTML = `<main class="wrap"><div class="hello"><h1>${tr.name}</h1><button class="btn line" data-act="home">Voltar</button></div><p class="note" style="text-align:left;margin-top:0">Escolha um n\u00edvel para treinar.</p><div class="stack" style="margin-top:0">${items}</div></main>`;
+  app.innerHTML = `<main class="wrap"><div class="hello"><h1>${tr.name}</h1><button class="btn line" data-act="home">Voltar</button></div><p class="note" style="text-align:left;margin-top:0">Escolha um n\u00edvel para treinar. Meta por folha: ${fmt(goalOf(t))}.</p><div class="stack" style="margin-top:0">${items}</div></main>`;
 }
 
 /* ============ folha de exerc\u00edcios ============ */
@@ -373,7 +378,7 @@ function viewSheet() {
   screen = 'sheet';
   window.scrollTo(0, 0);
   const lv = TR(sheet.t).levels[sheet.L];
-  app.innerHTML = `<header class="shead"><button class="ghost" data-act="exit" aria-label="Sair">\u2715</button><div class="ttl"><b>${lv.label}</b><small>Meta: ${fmt(lv.meta)}</small></div><div class="clock" id="clock">${fmt(T.ms / 1000)}</div></header>
+  app.innerHTML = `<header class="shead"><button class="ghost" data-act="exit" aria-label="Sair">\u2715</button><div class="ttl"><b>${lv.label}</b><small>Meta: ${fmt(goalOf(sheet.t))}</small></div><div class="clock" id="clock">${fmt(T.ms / 1000)}</div></header>
   <main class="wrap sheetwrap"><div class="paper" id="rows"></div></main>
   <div class="dock"><div class="bar" id="bar"></div>${keypad('\u2713')}</div>`;
   paintSheet();
@@ -453,8 +458,8 @@ function submitSheet() {
 }
 function finishSheet() {
   tStop();
-  const total = T.ms / 1000, tr = TR(sheet.t), lvl = tr.levels[sheet.L];
-  const within = total <= lvl.meta;
+  const total = T.ms / 1000;
+  const within = total <= goalOf(sheet.t);
   const perfect = sheet.first.correct === 10;
   const stars = within ? (perfect ? 3 : 2) : 1;
   const key = sheet.t + sheet.L, prev = state.best[key];
@@ -481,7 +486,7 @@ function finishSheet() {
 function viewDone() {
   screen = 'done';
   window.scrollTo(0, 0);
-  const r = sheet.res, tr = TR(sheet.t), lvl = tr.levels[sheet.L], n = tr.levels.length;
+  const r = sheet.res, tr = TR(sheet.t), n = tr.levels.length;
   const starsHtml = [1, 2, 3].map(i => `<span class="${i <= r.stars ? '' : 'off'}">\u2605</span>`).join('');
   let title, sub, cta;
   if (r.advanced) {
@@ -494,11 +499,11 @@ function viewDone() {
   } else if (r.within) {
     const left = NEED - r.streak;
     title = 'Folha r\u00e1pida! \u26a1';
-    sub = `Falta${left === 1 ? '' : 'm'} ${left} ${left === 1 ? 'folha' : 'folhas'} em at\u00e9 ${fmt(lvl.meta)} para subir de n\u00edvel.`;
+    sub = `Falta${left === 1 ? '' : 'm'} ${left} ${left === 1 ? 'folha' : 'folhas'} em at\u00e9 ${fmt(goalOf(sheet.t))} para subir de n\u00edvel.`;
     cta = 'Pr\u00f3xima folha';
   } else {
     title = 'Voc\u00ea acertou tudo! \ud83c\udf1f';
-    sub = `Para subir de n\u00edvel, fa\u00e7a ${NEED} folhas seguidas em at\u00e9 ${fmt(lvl.meta)}. A contagem recome\u00e7a agora. Vamos juntos!`;
+    sub = `Para subir de n\u00edvel, fa\u00e7a ${NEED} folhas seguidas em at\u00e9 ${fmt(goalOf(sheet.t))}. A contagem recome\u00e7a agora. Vamos juntos!`;
     cta = 'Tentar outra folha';
   }
   app.innerHTML = `<main class="wrap center">
@@ -511,7 +516,7 @@ function viewDone() {
       <div class="stat"><small>1\u00aa entrega</small><b>${sheet.first.correct} de 10</b></div>
       <div class="stat"><small>Tempo da 1\u00aa entrega</small><b>${fmt(sheet.first.time)}</b></div>
       <div class="stat"><small>Tempo total</small><b>${fmt(r.total)}</b></div>
-      <div class="stat"><small>Meta da folha</small><b>${fmt(lvl.meta)}</b></div>
+      <div class="stat"><small>Meta da folha</small><b>${fmt(goalOf(sheet.t))}</b></div>
     </div>
     <div class="stack"><button class="btn primary block" data-act="start" data-t="${sheet.t}" data-l="${r.advanced ? Math.min(state.lv[sheet.t], n - 1) : sheet.L}">${cta}</button><button class="btn line block" data-act="levels" data-t="${sheet.t}">Escolher n\u00edvel</button><button class="btn line block" data-act="home">Voltar ao in\u00edcio</button></div>
   </main>`;
@@ -571,8 +576,8 @@ function answerQ(skip) {
   pt.qi++; pt.val = '';
   if (pt.qi < 4) { paintTest(); return; }
   tStop();
-  const tr = TRACKS[pt.ti], lv = tr.levels[pt.li];
-  const pass = pt.ok >= 3 && T.ms / 1000 <= lv.meta * 0.5;
+  const tr = TRACKS[pt.ti];
+  const pass = pt.ok >= 3 && T.ms / 1000 <= goalOf(tr.id) * 0.5;
   if (pass) {
     pt.li++;
     if (pt.li >= tr.levels.length) { pt.res[tr.id] = pt.li; nextTrack(); }
@@ -633,11 +638,13 @@ function viewParents() {
     return `<div class="hrow"><div><b>${esc(TR(x.t).levels[x.L].label)}</b><br><span class="r" style="white-space:normal">1\u00aa entrega: ${x.f}/10 em ${fmt(x.ft)} \u00b7 total ${fmt(x.tt)}</span></div><div class="r">${dt}<br>${'\u2605'.repeat(x.s)}${x.a ? ' \u2191' : ''}</div></div>`;
   }).join('') || '<p class="note">Ainda n\u00e3o h\u00e1 folhas conclu\u00eddas.</p>';
   const selects = TRACKS.map(tr => `<label class="f" for="lv-${tr.id}">${tr.name}</label><select id="lv-${tr.id}" data-lv="${tr.id}">${tr.levels.map((l, i) => `<option value="${i}" ${state.lv[tr.id] === i ? 'selected' : ''}>N\u00edvel ${i + 1}: ${l.label}</option>`).join('')}<option value="${tr.levels.length}" ${state.lv[tr.id] >= tr.levels.length ? 'selected' : ''}>Trilha conclu\u00edda</option></select>`).join('');
+  const goalSel = TRACKS.map(tr => `<label class="f" for="gl-${tr.id}">${tr.name}</label><select id="gl-${tr.id}" data-goal="${tr.id}">${[...new Set([...GOALS, state.goal[tr.id]])].sort((a, b) => a - b).map(g => `<option value="${g}" ${state.goal[tr.id] === g ? 'selected' : ''}>${fmt(g)}</option>`).join('')}</select>`).join('');
   app.innerHTML = `<main class="wrap">
     <div class="hello"><h1>\u00c1rea dos pais</h1><button class="btn line" data-act="home">Voltar</button></div>
     <section class="card"><h3>Resumo</h3><div class="sum"><div><small>Folhas</small><b>${h.length}</b></div><div><small>N\u00edveis vencidos</small><b>${adv}</b></div><div><small>Pontos</small><b>${state.points}</b></div></div></section>
     <section class="card"><h3>Perfil</h3><label class="f" for="nm">Apelido (opcional)</label><input type="text" id="nm" maxlength="20" value="${esc(state.name)}" autocomplete="off"><p class="note" style="text-align:left">Use s\u00f3 um apelido. Tudo fica guardado apenas neste aparelho.</p></section>
     <section class="card"><h3>N\u00edvel de cada trilha</h3><p>Ajuste manualmente se achar que a crian\u00e7a est\u00e1 pronta (ou n\u00e3o).</p>${selects}</section>
+    <section class="card"><h3>Tempo-meta por folha</h3><p>Tempo m\u00e1ximo, com as corre\u00e7\u00f5es, para a folha contar como r\u00e1pida. Para subir de n\u00edvel s\u00e3o ${NEED} folhas seguidas dentro desse tempo.</p>${goalSel}</section>
     <section class="card"><h3>\u00daltimas folhas</h3>${recent}</section>
     <section class="card"><h3>Backup do progresso</h3><p>Gere o c\u00f3digo, copie e guarde em um lugar seguro (notas, e-mail para voc\u00ea mesmo). Para restaurar, cole o c\u00f3digo abaixo.</p>
       <button class="btn block" data-act="export">Gerar c\u00f3digo de backup</button>
@@ -698,6 +705,8 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const id = e.target.dataset && e.target.dataset.lv;
   if (id && TR(id)) { state.lv[id] = +e.target.value; state.st[id] = 0; state.placed = true; save(); toast('N\u00edvel atualizado'); }
+  const g = e.target.dataset && e.target.dataset.goal;
+  if (g && TR(g)) { state.goal[g] = num(+e.target.value, 30, 900, GOAL); save(); toast('Tempo atualizado'); }
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'nm') { state.name = e.target.value.slice(0, 20); save(); }
