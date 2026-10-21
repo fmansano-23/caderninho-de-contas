@@ -13,6 +13,7 @@
   --ok:#2b9367;--ok-soft:#e0f3ea;
   --warn:#e8a63a;--warn-soft:#fff0cb;--warn-ink:#7a4d00;
   --star:#f0b429;--shadow:0 2px 10px rgba(31,42,68,.08);
+  --gray:#e3e4e7;--gray-line:#c9ccd3;--gray-ink:#767b88;
   color-scheme:light;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
@@ -25,6 +26,7 @@
     --ok:#5cd0a0;--ok-soft:#1d3a31;
     --warn:#e8b04f;--warn-soft:#3a2f17;--warn-ink:#f0c36b;
     --star:#f5c24a;--shadow:0 2px 10px rgba(0,0,0,.35);
+    --gray:#2a2f3a;--gray-line:#3a4050;--gray-ink:#8189a0;
     color-scheme:dark;
   }
 }
@@ -34,6 +36,7 @@
   --ok:#5cd0a0;--ok-soft:#1d3a31;
   --warn:#e8b04f;--warn-soft:#3a2f17;--warn-ink:#f0c36b;
   --star:#f5c24a;--shadow:0 2px 10px rgba(0,0,0,.35);
+  --gray:#2a2f3a;--gray-line:#3a4050;--gray-ink:#8189a0;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -70,6 +73,20 @@ h1,h2,h3{margin:0}
 .dot{width:16px;height:6px;border-radius:3px;background:var(--line)}
 .dot.full{background:var(--ok)}
 .dot.cur{background:var(--accent)}
+.fast{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:13px;color:var(--muted)}
+.pip{width:10px;height:10px;border-radius:50%;background:var(--line)}
+.pip.on{background:var(--star)}
+.lvl{display:flex;align-items:center;gap:14px;width:100%;min-height:72px;padding:12px 16px;border-radius:16px;border:2px solid var(--line);background:var(--paper);text-align:left}
+.lvl .lm{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:18px;font-weight:700;flex:none}
+.lvl .lt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.lvl .lt small{font-size:13px;color:var(--muted)}
+.lvl.done{background:var(--ok-soft);border-color:var(--ok)}
+.lvl.done .lm{background:var(--ok);color:var(--paper)}
+.lvl.cur{background:var(--accent-soft);border-color:var(--accent)}
+.lvl.cur .lm{background:var(--accent);color:var(--accent-ink)}
+.lvl.lock{background:var(--gray);border-color:var(--gray-line);color:var(--gray-ink);cursor:default}
+.lvl.lock .lm{background:var(--gray-line);color:var(--gray-ink)}
+.lvl.lock b,.lvl.lock small{color:var(--gray-ink)}
 .links{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:8px}
 .note{font-size:14px;color:var(--muted);text-align:center;margin:10px 0}
 
@@ -176,66 +193,58 @@ const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { c
 const fmt = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const OP = { '+': '+', '-': '\u2212', '*': '\u00d7' };
 
-/* ============ trilhas e fases ============ */
+/* ============ trilhas e n\u00edveis ============ */
+const GOAL = 90;  /* tempo-meta (s) de uma folha de 10 contas */
+const NEED = 3;   /* folhas seguidas dentro da meta para subir de n\u00edvel */
 const mk = (a, b, op) => ({ a, b, op, ans: op === '+' ? a + b : op === '-' ? a - b : a * b });
-const poolAdd = (aMin, aMax, bMin, bMax, sMin, sMax) => () => {
+/* soma: resultado entre lo e hi; parcelas a partir de min */
+const poolAdd = (lo, hi, min) => () => {
   const r = [];
-  for (let a = aMin; a <= aMax; a++) for (let b = bMin; b <= bMax; b++) { const s = a + b; if (s >= sMin && s <= sMax) r.push(mk(a, b, '+')); }
+  for (let a = min; a < hi; a++) for (let b = min; a + b <= hi; b++) if (a + b >= lo) r.push(mk(a, b, '+'));
   return r;
 };
-const poolSub = (aMin, aMax, bMin, bMax, strict) => () => {
+/* subtra\u00e7\u00e3o: minuendo entre lo e hi, resultado sempre positivo */
+const poolSub = (lo, hi, min) => () => {
   const r = [];
-  for (let a = aMin; a <= aMax; a++) for (let b = bMin; b <= bMax; b++) if (b <= a - (strict ? 1 : 0)) r.push(mk(a, b, '-'));
+  for (let a = lo; a <= hi; a++) for (let b = min; b < a; b++) r.push(mk(a, b, '-'));
   return r;
 };
 const fromPool = pool => n => shuffle(pool()).slice(0, n);
-const multGen = (focus, review) => n => {
-  const nf = review.length ? Math.ceil(n * 0.7) : n;
-  const f = [], r = [];
-  focus.forEach(t => { for (let b = 1; b <= 10; b++) f.push([t, b]); });
-  review.forEach(t => { for (let b = 1; b <= 10; b++) r.push([t, b]); });
-  const pick = [...shuffle(f).slice(0, nf), ...shuffle(r).slice(0, n - nf)];
-  /* 3 × 4 e 4 × 3 podem aparecer juntas; a mesma conta idêntica não */
+/* multiplica\u00e7\u00e3o: tabuadas do foco, cada uma de 1 a 10 */
+const multGen = focus => n => {
+  const all = [];
+  focus.forEach(t => { for (let b = 1; b <= 10; b++) all.push([t, b]); });
+  /* 3 \u00d7 4 e 4 \u00d7 3 podem aparecer juntas; a mesma conta id\u00eantica n\u00e3o */
   const seen = new Set();
-  return shuffle(pick).map(([t, b]) => {
+  return shuffle(all).slice(0, n).map(([t, b]) => {
     let [x, y] = Math.random() < 0.5 ? [t, b] : [b, t];
     if (seen.has(x + '*' + y)) [x, y] = [y, x];
     seen.add(x + '*' + y);
     return mk(x, y, '*');
   });
 };
+/* n\u00edvel 1 = at\u00e9 20; depois de 21 a 40, 41 a 60, 61 a 80 e 81 a 100 */
+const rangeLevels = (word, pool) => [1, 2, 3, 4, 5].map(k => {
+  const lo = k === 1 ? 2 : (k - 1) * 20 + 1, hi = k * 20, min = k === 1 ? 1 : 2;
+  return { label: k === 1 ? `${word} at\u00e9 20` : `${word} de ${lo} a ${hi}`, meta: GOAL, build: fromPool(pool(lo, hi, min)) };
+});
 
-/* meta = tempo-meta (em segundos) para a folha de 10 contas */
 const TRACKS = [
-  { id: 'add', name: 'Soma', icon: '+', levels: [
-    { label: 'Soma at\u00e9 5',   meta: 120, build: fromPool(poolAdd(0, 5, 0, 5, 2, 5)) },
-    { label: 'Soma at\u00e9 10',  meta: 150, build: fromPool(poolAdd(1, 9, 1, 9, 5, 10)) },
-    { label: 'Soma at\u00e9 20',  meta: 210, build: fromPool(poolAdd(2, 18, 2, 18, 11, 20)) },
-    { label: 'Soma at\u00e9 50',  meta: 300, build: fromPool(poolAdd(10, 45, 2, 30, 21, 50)) },
-    { label: 'Soma at\u00e9 100', meta: 360, build: fromPool(poolAdd(11, 90, 11, 80, 51, 100)) }
-  ]},
-  { id: 'sub', name: 'Subtra\u00e7\u00e3o', icon: '\u2212', levels: [
-    { label: 'Subtra\u00e7\u00e3o at\u00e9 5',   meta: 150, build: fromPool(poolSub(1, 5, 1, 5, false)) },
-    { label: 'Subtra\u00e7\u00e3o at\u00e9 10',  meta: 180, build: fromPool(poolSub(6, 10, 1, 9, false)) },
-    { label: 'Subtra\u00e7\u00e3o at\u00e9 20',  meta: 240, build: fromPool(poolSub(11, 20, 2, 19, true)) },
-    { label: 'Subtra\u00e7\u00e3o at\u00e9 50',  meta: 330, build: fromPool(poolSub(21, 50, 2, 30, true)) },
-    { label: 'Subtra\u00e7\u00e3o at\u00e9 100', meta: 390, build: fromPool(poolSub(51, 100, 11, 90, true)) }
-  ]},
+  { id: 'add', name: 'Soma', icon: '+', levels: rangeLevels('Soma', poolAdd) },
+  { id: 'sub', name: 'Subtra\u00e7\u00e3o', icon: '\u2212', levels: rangeLevels('Subtra\u00e7\u00e3o', poolSub) },
   { id: 'mul', name: 'Multiplica\u00e7\u00e3o', icon: '\u00d7', levels: [
-    { label: 'Tabuadas do 1 e do 2',  meta: 150, build: multGen([1, 2], []) },
-    { label: 'Tabuadas do 3 e do 4',  meta: 180, build: multGen([3, 4], [1, 2]) },
-    { label: 'Tabuada do 5',          meta: 210, build: multGen([5], [1, 2, 3, 4]) },
-    { label: 'Tabuadas do 6 e do 7',  meta: 240, build: multGen([6, 7], [1, 2, 3, 4, 5]) },
-    { label: 'Tabuadas do 8, 9 e 10', meta: 270, build: multGen([8, 9, 10], [1, 2, 3, 4, 5, 6, 7]) },
-    { label: 'Todas as tabuadas',     meta: 300, build: multGen([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], []) }
+    { label: 'Tabuadas do 1, 2 e 3',             meta: GOAL, build: multGen([1, 2, 3]) },
+    { label: 'Tabuadas do 4, 5 e 6',             meta: GOAL, build: multGen([4, 5, 6]) },
+    { label: 'Tabuadas do 7, 8 e 9',             meta: GOAL, build: multGen([7, 8, 9]) },
+    { label: 'Tabuada do 10 e todas misturadas', meta: GOAL, build: multGen([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) }
   ]}
 ];
 const TR = id => TRACKS.find(t => t.id === id);
 
 /* ============ estado e armazenamento ============ */
-const KEY = 'caderninho-contas-v1';
+const KEY = 'caderninho-contas-v2';
 let storageOK = true;
-const defState = () => ({ v: 1, name: '', points: 0, placed: false, lv: { add: 0, sub: 0, mul: 0 }, best: {}, hist: [] });
+const defState = () => ({ v: 2, name: '', points: 0, placed: false, lv: { add: 0, sub: 0, mul: 0 }, st: { add: 0, sub: 0, mul: 0 }, best: {}, hist: [] });
 
 const num = (v, min, max, def) => Number.isFinite(+v) && v !== null && v !== '' ? Math.min(Math.max(Math.round(+v), min), max) : def;
 function sanitize(o) {
@@ -247,6 +256,7 @@ function sanitize(o) {
   TRACKS.forEach(t => {
     const v = o.lv && o.lv[t.id];
     d.lv[t.id] = Number.isInteger(v) ? Math.min(Math.max(v, 0), t.levels.length) : 0;
+    d.st[t.id] = num(o.st && o.st[t.id], 0, NEED - 1, 0);
   });
   if (o.best && typeof o.best === 'object') {
     Object.keys(o.best).forEach(k => { if (/^(add|sub|mul)\d$/.test(k) && Number.isFinite(o.best[k])) d.best[k] = num(o.best[k], 0, 86400, 0); });
@@ -323,9 +333,9 @@ function viewHome() {
     const L = state.lv[tr.id], n = tr.levels.length, done = L >= n;
     const lvl = tr.levels[Math.min(L, n - 1)];
     const dots = tr.levels.map((_, i) => `<i class="dot ${i < L ? 'full' : i === L ? 'cur' : ''}"></i>`).join('');
-    return `<section class="card trk"><div class="ico">${tr.icon}</div><div class="info"><h3>${tr.name}</h3><p>${done ? 'Trilha conclu\u00edda! \ud83c\udf89' : `Fase ${L + 1} de ${n}: ${lvl.label}`}</p><div class="dots">${dots}</div></div><button class="btn primary" data-act="start" data-t="${tr.id}">${done ? 'Treinar' : 'Come\u00e7ar'}</button></section>`;
+    return `<section class="card trk"><div class="ico">${tr.icon}</div><div class="info"><h3>${tr.name}</h3><p>${done ? 'Trilha conclu\u00edda! \ud83c\udf89' : `N\u00edvel ${L + 1} de ${n}: ${lvl.label}`}</p><div class="dots">${dots}</div>${done ? '' : `<div class="fast" aria-label="Folhas r\u00e1pidas: ${state.st[tr.id]} de ${NEED}">\u26a1 ${[...Array(NEED).keys()].map(i => `<i class="pip ${i < state.st[tr.id] ? 'on' : ''}"></i>`).join('')}</div>`}</div><button class="btn primary" data-act="levels" data-t="${tr.id}">${done ? 'Treinar' : 'Come\u00e7ar'}</button></section>`;
   }).join('');
-  const banner = state.placed ? '' : `<section class="card hl"><h3>Vamos descobrir por onde come\u00e7ar?</h3><p>Um teste r\u00e1pido de contas mostra a fase certa de cada trilha.</p><button class="btn primary block" data-act="test">Fazer o teste de n\u00edvel</button></section>`;
+  const banner = state.placed ? '' : `<section class="card hl"><h3>Vamos descobrir por onde come\u00e7ar?</h3><p>Um teste r\u00e1pido de contas mostra o n\u00edvel certo de cada trilha.</p><button class="btn primary block" data-act="test">Fazer o teste de n\u00edvel</button></section>`;
   const warn = storageOK ? '' : `<p class="note">Este navegador n\u00e3o est\u00e1 guardando o progresso. Use \u201cExportar\u201d na \u00c1rea dos pais para n\u00e3o perder nada.</p>`;
   app.innerHTML = `<main class="wrap">
     <div class="hello"><h1>Ol\u00e1${state.name ? ', ' + esc(state.name) : ''}!</h1><div class="pts">\u2b50 ${state.points}</div></div>
@@ -334,11 +344,26 @@ function viewHome() {
   </main>`;
 }
 
+/* ============ escolha de n\u00edvel ============ */
+function viewLevels(t) {
+  screen = 'levels';
+  window.scrollTo(0, 0);
+  const tr = TR(t), cur = state.lv[t];
+  const items = tr.levels.map((lv, i) => {
+    const k = i < cur ? 'done' : i === cur ? 'cur' : 'lock';
+    const mark = k === 'done' ? '\u2713' : k === 'cur' ? '\u25b6' : '\ud83d\udd12';
+    const note = k === 'done' ? 'Feito. Toque para treinar de novo' : k === 'cur' ? `Folhas r\u00e1pidas: ${state.st[t]} de ${NEED}` : 'Abre quando voc\u00ea passar o n\u00edvel azul';
+    return `<button class="lvl ${k}" ${k === 'lock' ? 'disabled' : `data-act="start" data-t="${t}" data-l="${i}"`}><span class="lm" aria-hidden="true">${mark}</span><span class="lt"><b>N\u00edvel ${i + 1}</b><small>${lv.label}</small><small>${note}</small></span></button>`;
+  }).join('');
+  app.innerHTML = `<main class="wrap"><div class="hello"><h1>${tr.name}</h1><button class="btn line" data-act="home">Voltar</button></div><p class="note" style="text-align:left;margin-top:0">Escolha um n\u00edvel para treinar.</p><div class="stack" style="margin-top:0">${items}</div></main>`;
+}
+
 /* ============ folha de exerc\u00edcios ============ */
-function startSheet(t) {
+function startSheet(t, pick) {
   const tr = TR(t), n = tr.levels.length;
-  const practice = state.lv[t] >= n;
-  const L = Math.min(state.lv[t], n - 1);
+  const top = Math.min(state.lv[t], n - 1);
+  const L = Number.isInteger(pick) && pick >= 0 && pick <= top ? pick : top;
+  const practice = L < state.lv[t];
   const items = tr.levels[L].build(10).map(x => ({ ...x, val: '', ok: false, fresh: false }));
   sheet = { t, L, practice, items, sel: 0, phase: 'fill', first: null, rounds: 0, res: null };
   T.ms = 0; tStart();
@@ -432,21 +457,25 @@ function finishSheet() {
   const within = total <= lvl.meta;
   const perfect = sheet.first.correct === 10;
   const stars = within ? (perfect ? 3 : 2) : 1;
-  const advanced = within && !sheet.practice;
   const key = sheet.t + sheet.L, prev = state.best[key];
   const record = prev !== undefined && total < prev;
   if (prev === undefined || total < prev) state.best[key] = Math.round(total);
-  let pts = 0;
-  if (advanced) {
-    pts = 100 + (stars - 1) * 10 + (record ? 20 : 0);
-    state.points += pts;
-    state.lv[sheet.t] = sheet.L + 1;
+  let pts = 0, advanced = false, streak = state.st[sheet.t];
+  if (!sheet.practice) {
+    streak = within ? streak + 1 : 0;
+    if (streak >= NEED) {
+      advanced = true;
+      pts = 100 + (stars - 1) * 10 + (record ? 20 : 0);
+      state.points += pts;
+      state.lv[sheet.t] = sheet.L + 1;
+      state.st[sheet.t] = 0;
+    } else state.st[sheet.t] = streak;
   }
   state.hist.push({ d: Date.now(), t: sheet.t, L: sheet.L, f: sheet.first.correct, ft: Math.round(sheet.first.time), tt: Math.round(total), r: sheet.rounds, s: stars, a: advanced ? 1 : 0, p: pts });
   if (state.hist.length > 300) state.hist = state.hist.slice(-300);
   save();
   sheet.phase = 'done';
-  sheet.res = { total, within, stars, advanced, pts, record, perfect };
+  sheet.res = { total, within, stars, advanced, pts, record, perfect, streak };
   viewDone();
 }
 function viewDone() {
@@ -457,15 +486,20 @@ function viewDone() {
   let title, sub, cta;
   if (r.advanced) {
     const concluded = state.lv[sheet.t] >= n;
-    title = concluded ? `Trilha de ${tr.name} conclu\u00edda! \ud83c\udf89` : 'Voc\u00ea subiu de fase! \ud83d\ude80';
-    sub = concluded ? 'Voc\u00ea dominou todas as fases desta trilha.' : `Pr\u00f3xima fase: ${tr.levels[state.lv[sheet.t]].label}.`;
-    cta = concluded ? 'Continuar treinando' : 'Pr\u00f3xima fase';
+    title = concluded ? `Trilha de ${tr.name} conclu\u00edda! \ud83c\udf89` : 'Voc\u00ea subiu de n\u00edvel! \ud83d\ude80';
+    sub = concluded ? 'Voc\u00ea dominou todos os n\u00edveis desta trilha.' : `Pr\u00f3ximo n\u00edvel: ${tr.levels[state.lv[sheet.t]].label}.`;
+    cta = concluded ? 'Continuar treinando' : 'Pr\u00f3ximo n\u00edvel';
   } else if (sheet.practice) {
     title = 'Treino conclu\u00eddo!'; sub = 'Voc\u00ea acertou tudo. Continue treinando para ficar cada vez mais r\u00e1pido.'; cta = 'Mais uma folha';
+  } else if (r.within) {
+    const left = NEED - r.streak;
+    title = 'Folha r\u00e1pida! \u26a1';
+    sub = `Falta${left === 1 ? '' : 'm'} ${left} ${left === 1 ? 'folha' : 'folhas'} em at\u00e9 ${fmt(lvl.meta)} para subir de n\u00edvel.`;
+    cta = 'Pr\u00f3xima folha';
   } else {
     title = 'Voc\u00ea acertou tudo! \ud83c\udf1f';
-    sub = 'Mais uma rodadinha para ficar bem r\u00e1pido e a gente sobe de fase.';
-    cta = 'Mais uma rodadinha';
+    sub = `Para subir de n\u00edvel, fa\u00e7a ${NEED} folhas seguidas em at\u00e9 ${fmt(lvl.meta)}. A contagem recome\u00e7a agora. Vamos juntos!`;
+    cta = 'Tentar outra folha';
   }
   app.innerHTML = `<main class="wrap center">
     <div class="stars" aria-label="${r.stars} de 3 estrelas">${starsHtml}</div>
@@ -477,9 +511,9 @@ function viewDone() {
       <div class="stat"><small>1\u00aa entrega</small><b>${sheet.first.correct} de 10</b></div>
       <div class="stat"><small>Tempo da 1\u00aa entrega</small><b>${fmt(sheet.first.time)}</b></div>
       <div class="stat"><small>Tempo total</small><b>${fmt(r.total)}</b></div>
-      <div class="stat"><small>Meta da fase</small><b>${fmt(lvl.meta)}</b></div>
+      <div class="stat"><small>Meta da folha</small><b>${fmt(lvl.meta)}</b></div>
     </div>
-    <div class="stack"><button class="btn primary block" data-act="start" data-t="${sheet.t}">${cta}</button><button class="btn line block" data-act="home">Voltar ao in\u00edcio</button></div>
+    <div class="stack"><button class="btn primary block" data-act="start" data-t="${sheet.t}" data-l="${r.advanced ? Math.min(state.lv[sheet.t], n - 1) : sheet.L}">${cta}</button><button class="btn line block" data-act="levels" data-t="${sheet.t}">Escolher n\u00edvel</button><button class="btn line block" data-act="home">Voltar ao in\u00edcio</button></div>
   </main>`;
 }
 function exitSheet() {
@@ -499,7 +533,7 @@ function viewTestIntro() {
   app.innerHTML = `<main class="wrap center">
     <div class="ico" style="margin:30px auto 14px;width:72px;height:72px;font-size:42px">${tr.icon}</div>
     <h1 class="big-t">${first ? 'Teste de n\u00edvel' : 'Agora vamos de ' + tr.name}</h1>
-    <p class="sub-t">${first ? 'S\u00e3o contas r\u00e1pidas para o app saber em qual fase come\u00e7ar. Responda o que souber e, se n\u00e3o souber alguma, toque em \u201cPular\u201d. Sem pressa e sem preocupa\u00e7\u00e3o.' : 'Mesma ideia: responda o que souber e pule o que n\u00e3o souber.'}</p>
+    <p class="sub-t">${first ? 'S\u00e3o contas r\u00e1pidas para o app saber em qual n\u00edvel come\u00e7ar. Responda o que souber e, se n\u00e3o souber alguma, toque em \u201cPular\u201d. Sem pressa e sem preocupa\u00e7\u00e3o.' : 'Mesma ideia: responda o que souber e pule o que n\u00e3o souber.'}</p>
     <p class="sub-t"><b>${tr.name}</b></p>
     <div class="stack"><button class="btn primary block" data-act="testgo">Vamos l\u00e1</button><button class="btn line block" data-act="${first ? 'home' : 'stoptest'}">${first ? 'Agora n\u00e3o' : 'Parar o teste'}</button></div>
   </main>`;
@@ -569,7 +603,7 @@ function viewTestResult(res) {
     <h1 class="big-t" style="margin-top:24px">Pronto! \ud83c\udf89</h1>
     <p class="sub-t">Estes s\u00e3o os pontos de partida de cada trilha:</p>
     <div class="card" style="text-align:left">${rows}</div>
-    <p class="note">Os pais podem ajustar qualquer fase na \u00c1rea dos pais.</p>
+    <p class="note">Os pais podem ajustar qualquer n\u00edvel na \u00c1rea dos pais.</p>
     <div class="stack"><button class="btn primary block" data-act="home">Ir para o in\u00edcio</button></div>
   </main>`;
 }
@@ -582,7 +616,7 @@ function stopTest() {
 }
 
 /* ============ \u00e1rea dos pais ============ */
-const PREFIX = 'CADERNINHO1:';
+const PREFIX = 'CADERNINHO2:';
 const encode = () => PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(state))));
 function decode(code) {
   code = String(code).trim();
@@ -598,19 +632,19 @@ function viewParents() {
     const dt = x.d ? new Date(x.d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '--';
     return `<div class="hrow"><div><b>${esc(TR(x.t).levels[x.L].label)}</b><br><span class="r" style="white-space:normal">1\u00aa entrega: ${x.f}/10 em ${fmt(x.ft)} \u00b7 total ${fmt(x.tt)}</span></div><div class="r">${dt}<br>${'\u2605'.repeat(x.s)}${x.a ? ' \u2191' : ''}</div></div>`;
   }).join('') || '<p class="note">Ainda n\u00e3o h\u00e1 folhas conclu\u00eddas.</p>';
-  const selects = TRACKS.map(tr => `<label class="f" for="lv-${tr.id}">${tr.name}</label><select id="lv-${tr.id}" data-lv="${tr.id}">${tr.levels.map((l, i) => `<option value="${i}" ${state.lv[tr.id] === i ? 'selected' : ''}>Fase ${i + 1}: ${l.label}</option>`).join('')}<option value="${tr.levels.length}" ${state.lv[tr.id] >= tr.levels.length ? 'selected' : ''}>Trilha conclu\u00edda</option></select>`).join('');
+  const selects = TRACKS.map(tr => `<label class="f" for="lv-${tr.id}">${tr.name}</label><select id="lv-${tr.id}" data-lv="${tr.id}">${tr.levels.map((l, i) => `<option value="${i}" ${state.lv[tr.id] === i ? 'selected' : ''}>N\u00edvel ${i + 1}: ${l.label}</option>`).join('')}<option value="${tr.levels.length}" ${state.lv[tr.id] >= tr.levels.length ? 'selected' : ''}>Trilha conclu\u00edda</option></select>`).join('');
   app.innerHTML = `<main class="wrap">
     <div class="hello"><h1>\u00c1rea dos pais</h1><button class="btn line" data-act="home">Voltar</button></div>
-    <section class="card"><h3>Resumo</h3><div class="sum"><div><small>Folhas</small><b>${h.length}</b></div><div><small>Fases vencidas</small><b>${adv}</b></div><div><small>Pontos</small><b>${state.points}</b></div></div></section>
+    <section class="card"><h3>Resumo</h3><div class="sum"><div><small>Folhas</small><b>${h.length}</b></div><div><small>N\u00edveis vencidos</small><b>${adv}</b></div><div><small>Pontos</small><b>${state.points}</b></div></div></section>
     <section class="card"><h3>Perfil</h3><label class="f" for="nm">Apelido (opcional)</label><input type="text" id="nm" maxlength="20" value="${esc(state.name)}" autocomplete="off"><p class="note" style="text-align:left">Use s\u00f3 um apelido. Tudo fica guardado apenas neste aparelho.</p></section>
-    <section class="card"><h3>Fase de cada trilha</h3><p>Ajuste manualmente se achar que a crian\u00e7a est\u00e1 pronta (ou n\u00e3o).</p>${selects}</section>
+    <section class="card"><h3>N\u00edvel de cada trilha</h3><p>Ajuste manualmente se achar que a crian\u00e7a est\u00e1 pronta (ou n\u00e3o).</p>${selects}</section>
     <section class="card"><h3>\u00daltimas folhas</h3>${recent}</section>
     <section class="card"><h3>Backup do progresso</h3><p>Gere o c\u00f3digo, copie e guarde em um lugar seguro (notas, e-mail para voc\u00ea mesmo). Para restaurar, cole o c\u00f3digo abaixo.</p>
       <button class="btn block" data-act="export">Gerar c\u00f3digo de backup</button>
       <textarea id="code" placeholder="O c\u00f3digo aparece aqui. Para importar, cole um c\u00f3digo e toque em Importar." spellcheck="false"></textarea>
       <div class="mbtn" style="margin-top:8px"><button class="btn" data-act="copy">Copiar</button><button class="btn" data-act="import">Importar</button></div>
     </section>
-    <section class="card"><h3>Recome\u00e7ar</h3><p>Apaga pontos, fases e hist\u00f3rico deste aparelho.</p><button class="btn line block" data-act="reset">Apagar tudo</button></section>
+    <section class="card"><h3>Recome\u00e7ar</h3><p>Apaga pontos, n\u00edveis e hist\u00f3rico deste aparelho.</p><button class="btn line block" data-act="reset">Apagar tudo</button></section>
   </main>`;
 }
 async function copyCode() {
@@ -631,7 +665,7 @@ function importCode() {
   ]);
 }
 function resetAll() {
-  modal('Apagar tudo?', 'Pontos, fases e hist\u00f3rico ser\u00e3o apagados. Fa\u00e7a um backup antes se quiser guardar.', [
+  modal('Apagar tudo?', 'Pontos, n\u00edveis e hist\u00f3rico ser\u00e3o apagados. Fa\u00e7a um backup antes se quiser guardar.', [
     { label: 'Apagar', cls: 'primary', fn: () => { state = defState(); save(); viewHome(); } },
     { label: 'Cancelar', cls: 'line' }
   ]);
@@ -641,7 +675,8 @@ function resetAll() {
 const actions = {
   home: viewHome,
   parents: viewParents,
-  start: d => startSheet(d.t),
+  start: d => startSheet(d.t, d.l === undefined ? undefined : +d.l),
+  levels: d => viewLevels(d.t),
   test: startTest,
   testgo: beginStage,
   stoptest: stopTest,
@@ -662,7 +697,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => {
   const id = e.target.dataset && e.target.dataset.lv;
-  if (id && TR(id)) { state.lv[id] = +e.target.value; state.placed = true; save(); toast('Fase atualizada'); }
+  if (id && TR(id)) { state.lv[id] = +e.target.value; state.st[id] = 0; state.placed = true; save(); toast('N\u00edvel atualizado'); }
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'nm') { state.name = e.target.value.slice(0, 20); save(); }

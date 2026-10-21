@@ -13,8 +13,8 @@ Se o GitHub Pages estiver ativado, o app fica disponível na URL do repositório
 ## Estrutura
 
 ```
-index.html app completo (HTML, CSS e JS)
-fonts/ fonte Andika (Regular e Bold)
+index.html     app completo (HTML, CSS e JS)
+fonts/         fonte Andika (Regular e Bold)
 ```
 
 ## Observação
