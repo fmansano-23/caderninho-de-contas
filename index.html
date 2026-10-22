@@ -197,6 +197,11 @@ const OP = { '+': '+', '-': '\u2212', '*': '\u00d7' };
 const GOAL = 90;  /* tempo-meta padr\u00e3o (s) de uma folha de 10 contas; os pais ajustam por trilha */
 const GOALS = [45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
 const goalOf = t => state.goal[t];
+const PTS_MAX = 100, PTS_MIN = 10, PTS_LEVEL = 50, PTS_TRY = 10;
+/* repetir sem melhorar paga PTS_TRY, mas s\u00f3 nas TRY_LIMIT primeiras folhas r\u00e1pidas do n\u00edvel; depois de SLOW_LIMIT folhas fora da meta sem melhorar, o b\u00f4nus cai para PTS_TRY_LOW; SLOW = m\u00faltiplo da meta que conta como folha lenta */
+const TRY_LIMIT = 3, SLOW_LIMIT = 5, PTS_TRY_LOW = 1, SLOW = 2;
+/* PTS_MAX at\u00e9 a meta; cai em linha reta at\u00e9 PTS_MIN ao chegar a 3 vezes a meta (de 5 em 5) */
+const timePoints = (sec, goal) => sec <= goal ? PTS_MAX : Math.max(PTS_MIN, Math.round((PTS_MAX - (PTS_MAX - PTS_MIN) * Math.min(1, (sec - goal) / (2 * goal))) / 5) * 5);
 const NEED = 3;   /* folhas seguidas dentro da meta para subir de n\u00edvel */
 const mk = (a, b, op) => ({ a, b, op, ans: op === '+' ? a + b : op === '-' ? a - b : a * b });
 /* soma: resultado entre lo e hi; parcelas a partir de min */
@@ -232,9 +237,9 @@ const rangeLevels = (word, pool) => [1, 2, 3, 4, 5].map(k => {
 });
 
 const TRACKS = [
-  { id: 'add', name: 'Soma', icon: '+', levels: rangeLevels('Soma', poolAdd) },
-  { id: 'sub', name: 'Subtra\u00e7\u00e3o', icon: '\u2212', levels: rangeLevels('Subtra\u00e7\u00e3o', poolSub) },
-  { id: 'mul', name: 'Multiplica\u00e7\u00e3o', icon: '\u00d7', levels: [
+  { id: 'add', name: 'Soma', icon: '+', weight: 1, levels: rangeLevels('Soma', poolAdd) },
+  { id: 'sub', name: 'Subtra\u00e7\u00e3o', icon: '\u2212', weight: 1.25, levels: rangeLevels('Subtra\u00e7\u00e3o', poolSub) },
+  { id: 'mul', name: 'Multiplica\u00e7\u00e3o', icon: '\u00d7', weight: 1.5, levels: [
     { label: 'Tabuadas do 1 e 2',                build: multGen([1, 2]) },
     { label: 'Tabuadas do 3 e 4',                build: multGen([3, 4]) },
     { label: 'Tabuada do 5',                     build: multGen([5]) },
@@ -248,7 +253,7 @@ const TR = id => TRACKS.find(t => t.id === id);
 /* ============ estado e armazenamento ============ */
 const KEY = 'caderninho-contas-v2';
 let storageOK = true;
-const defState = () => ({ v: 2, name: '', points: 0, placed: false, lv: { add: 0, sub: 0, mul: 0 }, st: { add: 0, sub: 0, mul: 0 }, goal: { add: GOAL, sub: GOAL, mul: GOAL }, best: {}, hist: [] });
+const defState = () => ({ v: 2, name: '', points: 0, placed: false, lv: { add: 0, sub: 0, mul: 0 }, st: { add: 0, sub: 0, mul: 0 }, goal: { add: GOAL, sub: GOAL, mul: GOAL }, best: {}, sc: {}, fr: {}, sl: {}, hist: [] });
 
 const num = (v, min, max, def) => Number.isFinite(+v) && v !== null && v !== '' ? Math.min(Math.max(Math.round(+v), min), max) : def;
 function sanitize(o) {
@@ -265,6 +270,15 @@ function sanitize(o) {
   });
   if (o.best && typeof o.best === 'object') {
     Object.keys(o.best).forEach(k => { if (/^(add|sub|mul)\d$/.test(k) && Number.isFinite(o.best[k])) d.best[k] = num(o.best[k], 0, 86400, 0); });
+  }
+  if (o.sc && typeof o.sc === 'object') {
+    Object.keys(o.sc).forEach(k => { if (/^(add|sub|mul)\d$/.test(k)) d.sc[k] = num(o.sc[k], PTS_MIN, PTS_MAX, PTS_MIN); });
+  }
+  if (o.fr && typeof o.fr === 'object') {
+    Object.keys(o.fr).forEach(k => { if (/^(add|sub|mul)\d$/.test(k)) d.fr[k] = num(o.fr[k], 0, TRY_LIMIT, 0); });
+  }
+  if (o.sl && typeof o.sl === 'object') {
+    Object.keys(o.sl).forEach(k => { if (/^(add|sub|mul)\d$/.test(k)) d.sl[k] = num(o.sl[k], 0, SLOW_LIMIT, 0); });
   }
   if (Array.isArray(o.hist)) {
     d.hist = o.hist
@@ -464,30 +478,66 @@ function finishSheet() {
   const stars = within ? (perfect ? 3 : 2) : 1;
   const key = sheet.t + sheet.L, prev = state.best[key];
   const record = prev !== undefined && total < prev;
+  /* o n\u00edvel vale no m\u00e1ximo PTS_MAX: repetir s\u00f3 paga a diferen\u00e7a para o melhor resultado dele */
+  const score = timePoints(total, goalOf(sheet.t));
+  const prevScore = state.sc[key] !== undefined ? state.sc[key] : prev !== undefined ? timePoints(prev, goalOf(sheet.t)) : 0;
+  const w = TR(sheet.t).weight;
+  const gain = Math.max(0, Math.round(score * w) - Math.round(prevScore * w));
+  state.sc[key] = Math.max(score, prevScore);
+  /* sem melhora: +PTS_TRY por tentar, mas a folha r\u00e1pida sem melhora s\u00f3 paga TRY_LIMIT vezes (zera quando melhora) */
+  let tryPts = 0, blocked = false, reduced = false;
+  if (gain > 0) { state.fr[key] = 0; state.sl[key] = 0; }
+  else if (!within) {
+    reduced = (state.sl[key] || 0) >= SLOW_LIMIT;
+    tryPts = reduced ? PTS_TRY_LOW : Math.round(PTS_TRY * w);
+    if (!reduced) state.sl[key] = (state.sl[key] || 0) + 1;
+  } else if ((state.fr[key] || 0) < TRY_LIMIT) { state.fr[key] = (state.fr[key] || 0) + 1; tryPts = Math.round(PTS_TRY * w); }
+  else blocked = true;
   if (prev === undefined || total < prev) state.best[key] = Math.round(total);
-  let pts = 0, advanced = false, streak = state.st[sheet.t];
+  let advanced = false, streak = state.st[sheet.t];
   if (!sheet.practice) {
     streak = within ? streak + 1 : 0;
     if (streak >= NEED) {
       advanced = true;
-      pts = 100 + (stars - 1) * 10 + (record ? 20 : 0);
-      state.points += pts;
       state.lv[sheet.t] = sheet.L + 1;
       state.st[sheet.t] = 0;
     } else state.st[sheet.t] = streak;
   }
+  const lvPts = advanced ? Math.round(PTS_LEVEL * w) : 0;
+  const pts = gain + tryPts + lvPts;
+  state.points += pts;
   state.hist.push({ d: Date.now(), t: sheet.t, L: sheet.L, f: sheet.first.correct, ft: Math.round(sheet.first.time), tt: Math.round(total), r: sheet.rounds, s: stars, a: advanced ? 1 : 0, p: pts });
   if (state.hist.length > 300) state.hist = state.hist.slice(-300);
   save();
   sheet.phase = 'done';
-  sheet.res = { total, within, stars, advanced, pts, record, perfect, streak };
+  sheet.res = { total, within, stars, advanced, pts, score, prevScore, gain, tryPts, lvPts, w, blocked, reduced, slow: total > SLOW * goalOf(sheet.t), record, perfect, streak };
   viewDone();
+}
+function pointsNote(r) {
+  const W = x => Math.round(x * r.w), top = W(PTS_MAX);
+  const best = Math.max(r.score, r.prevScore);
+  let t = r.prevScore === 0 ? `Tempo: ${W(r.score)} de ${top} pontos`
+    : r.gain > 0 ? `Voc\u00ea melhorou neste n\u00edvel: ${W(r.prevScore)} \u2192 ${W(r.score)} de ${top}`
+    : best >= PTS_MAX ? `Voc\u00ea j\u00e1 tem a pontua\u00e7\u00e3o m\u00e1xima neste n\u00edvel (${top})`
+    : `Seu melhor neste n\u00edvel: ${W(best)} de ${top}`;
+  if (r.w !== 1) t += ` (peso da trilha \u00d7${String(r.w).replace('.', ',')})`;
+  if (r.tryPts) t += ` \u00b7 Por tentar de novo: +${r.tryPts}`;
+  if (r.advanced) t += ` \u00b7 Novo n\u00edvel: +${r.lvPts}`;
+  if (best < PTS_MAX) t += `. Terminando em at\u00e9 ${fmt(goalOf(sheet.t))}, voc\u00ea chega aos ${top}!`;
+  return t;
+}
+function tipNote(r) {
+  if (r.reduced) return `Muitas folhas fora da meta sem melhorar: o b\u00f4nus por tentar caiu para ${PTS_TRY_LOW}. ${sheet.L > 0 ? 'Melhore o seu tempo ou treine o n\u00edvel anterior para voltar a ganhar mais.' : 'Melhore o seu tempo para voltar a ganhar mais.'}`;
+  if (r.blocked) return `Voc\u00ea est\u00e1 muito r\u00e1pido neste n\u00edvel! ${sheet.L + 1 < TR(sheet.t).levels.length ? 'Tente o pr\u00f3ximo n\u00edvel para ganhar mais pontos.' : 'Tente outra trilha para ganhar mais pontos.'}`;
+  if (r.slow) return sheet.L > 0 ? 'Est\u00e1 puxado? Que tal treinar o n\u00edvel anterior antes de subir?' : 'Continue treinando: voc\u00ea vai ficar cada vez mais r\u00e1pido!';
+  return '';
 }
 function viewDone() {
   screen = 'done';
   window.scrollTo(0, 0);
   const r = sheet.res, tr = TR(sheet.t), n = tr.levels.length;
   const starsHtml = [1, 2, 3].map(i => `<span class="${i <= r.stars ? '' : 'off'}">\u2605</span>`).join('');
+  const tip = tipNote(r);
   let title, sub, cta;
   if (r.advanced) {
     const concluded = state.lv[sheet.t] >= n;
@@ -510,7 +560,9 @@ function viewDone() {
     <div class="stars" aria-label="${r.stars} de 3 estrelas">${starsHtml}</div>
     <h1 class="big-t">${title}</h1>
     <p class="sub-t">${sub}</p>
-    ${r.advanced ? `<div class="badge">+${r.pts} pontos</div>` : ''}
+    ${r.pts ? `<div class="badge">+${r.pts} pontos</div>` : ''}
+    <p class="note">${pointsNote(r)}</p>
+    ${tip ? `<p class="note"><b>${tip}</b></p>` : ''}
     ${r.record ? '<div class="badge">\u23f1\ufe0f Novo recorde de tempo!</div>' : ''}
     <div class="stats">
       <div class="stat"><small>1\u00aa entrega</small><b>${sheet.first.correct} de 10</b></div>
@@ -642,6 +694,7 @@ function viewParents() {
   app.innerHTML = `<main class="wrap">
     <div class="hello"><h1>\u00c1rea dos pais</h1><button class="btn line" data-act="home">Voltar</button></div>
     <section class="card"><h3>Resumo</h3><div class="sum"><div><small>Folhas</small><b>${h.length}</b></div><div><small>N\u00edveis vencidos</small><b>${adv}</b></div><div><small>Pontos</small><b>${state.points}</b></div></div></section>
+    <section class="card"><h3>Como os pontos funcionam</h3><p>Cada n\u00edvel vale at\u00e9 ${PTS_MAX} pontos: o m\u00e1ximo vem ao terminar dentro do tempo-meta e cai aos poucos conforme o tempo passa (m\u00ednimo de ${PTS_MIN}, a partir de 3 vezes a meta). Ao repetir um n\u00edvel, a crian\u00e7a ganha s\u00f3 a diferen\u00e7a para o melhor resultado dela nele, ent\u00e3o somar v\u00e1rias tentativas nunca passa do m\u00e1ximo. Repetir sem melhorar d\u00e1 +${PTS_TRY} por folha, mas s\u00f3 nas ${TRY_LIMIT} primeiras folhas r\u00e1pidas seguidas do n\u00edvel; depois disso s\u00f3 pontua se melhorar. Folha fora da meta tamb\u00e9m paga, mas depois de ${SLOW_LIMIT} sem melhorar o b\u00f4nus cai para ${PTS_TRY_LOW} ponto, e o app sugere melhorar o tempo ou treinar o n\u00edvel anterior. Subir de n\u00edvel d\u00e1 +${PTS_LEVEL}. Cada trilha tem um peso que multiplica os pontos: ${TRACKS.map(t => `${t.name} \u00d7${String(t.weight).replace('.', ',')}`).join(', ')}.</p></section>
     <section class="card"><h3>Perfil</h3><label class="f" for="nm">Apelido (opcional)</label><input type="text" id="nm" maxlength="20" value="${esc(state.name)}" autocomplete="off"><p class="note" style="text-align:left">Use s\u00f3 um apelido. Tudo fica guardado apenas neste aparelho.</p></section>
     <section class="card"><h3>N\u00edvel de cada trilha</h3><p>Ajuste manualmente se achar que a crian\u00e7a est\u00e1 pronta (ou n\u00e3o).</p>${selects}</section>
     <section class="card"><h3>Tempo-meta por folha</h3><p>Tempo m\u00e1ximo, com as corre\u00e7\u00f5es, para a folha contar como r\u00e1pida. Para subir de n\u00edvel s\u00e3o ${NEED} folhas seguidas dentro desse tempo.</p>${goalSel}</section>
